@@ -1,26 +1,123 @@
 @import "tailwindcss";
 
+/* ── THEME VARIABLES ── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #0b1a22;
+  --surface: #122130;
+  --surface2: #1a2f3e;
+  --border: #1e3545;
+  --teal: #4fa8a6;
+  --teal-dim: #3d8381;
+  --teal-dark: #1c3440;
+  --amber: #ec9f35;
+  --amber-dim: #c8873a;
+  --red: #e05252;
+  --green: #3ecf7a;
+  --text: #eef4f6;
+  --muted: #6b8fa0;
+  --radius: 12px;
+
+  --background: var(--bg);
+  --foreground: var(--text);
+  --primary: var(--teal);
+  --primary-foreground: #0b1a22;
+  --secondary: var(--surface2);
+  --secondary-foreground: var(--text);
+  --accent: var(--surface2);
+  --accent-foreground: var(--text);
+  --destructive: var(--red);
+  --destructive-foreground: #ffffff;
+  --ring: var(--teal);
+  --input: var(--border);
+}
+
+[data-theme="light"] {
+  --bg: #f0f5f6;
+  --surface: #ffffff;
+  --surface2: #e6eef0;
+  --border: #cddde2;
+  --teal: #2e8a87;
+  --teal-dim: #246e6c;
+  --teal-dark: #1c3440;
+  --amber: #c8873a;
+  --amber-dim: #a86e2e;
+  --red: #cc3333;
+  --green: #1f9e57;
+  --text: #0d2535;
+  --muted: #5a7d8e;
+
+  --background: var(--bg);
+  --foreground: var(--text);
+  --primary: var(--teal);
+  --primary-foreground: #ffffff;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+
+  --color-sp-bg: var(--bg);
+  --color-sp-surface: var(--surface);
+  --color-sp-surface2: var(--surface2);
+  --color-sp-border: var(--border);
+  --color-sp-teal: var(--teal);
+  --color-sp-teal-dim: var(--teal-dim);
+  --color-sp-teal-dark: var(--teal-dark);
+  --color-sp-amber: var(--amber);
+  --color-sp-amber-dim: var(--amber-dim);
+  --color-sp-red: var(--red);
+  --color-sp-green: var(--green);
+  --color-sp-text: var(--text);
+  --color-sp-muted: var(--muted);
+
+  --radius-sp: var(--radius);
+  --font-display: "Bebas Neue", sans-serif;
+  --font-body: "Nunito Sans", sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
 }
+
+/* ── TICKER ANIMATION ── */
+@keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.ticker-animate {
+  animation: ticker-scroll 30s linear infinite;
+}
+
+/* ── FADE IN ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease;
+}
+
+/* ── SCROLLBAR HIDE ── */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { scrollbar-width: none; }
