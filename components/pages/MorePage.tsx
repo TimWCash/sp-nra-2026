@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { Check, Mail, Truck, MapPin, ChevronRight, ExternalLink, Copy } from "lucide-react"
 import { packingList, moreLinks, emailTemplate } from "@/lib/data"
 
 function CheckItem({ id, label }: { id: string; label: string }) {
@@ -19,128 +20,139 @@ function CheckItem({ id, label }: { id: string; label: string }) {
   }, [id])
 
   return (
-    <div className="flex items-start gap-3 py-3 border-b border-sp-border last:border-b-0">
-      <button onClick={toggle}
-        className={`w-5 h-5 rounded-md border-[1.5px] flex-shrink-0 cursor-pointer flex items-center justify-center transition-all mt-0.5 ${
-          checked ? "bg-sp-green border-sp-green" : "bg-transparent border-sp-border"
-        }`}>
-        {checked && <span className="text-[#0b1a22] text-xs font-bold">\u2713</span>}
-      </button>
-      <div className={`text-sm font-medium ${checked ? "line-through opacity-40" : ""}`}>{label}</div>
-    </div>
+    <button onClick={toggle} className="flex items-start gap-3 py-3 w-full text-left cursor-pointer bg-transparent border-none border-b"
+      style={{ borderColor: "var(--border)" }}>
+      <div className="w-5 h-5 rounded-md flex-shrink-0 flex items-center justify-center transition-all duration-150 mt-0.5"
+        style={{
+          background: checked ? "var(--success)" : "var(--surface)",
+          border: checked ? "none" : "1.5px solid var(--border-strong)",
+        }}>
+        {checked && <Check size={12} strokeWidth={3} color="white" />}
+      </div>
+      <span className={`text-sm font-medium ${checked ? "line-through opacity-40" : ""}`}
+        style={{ color: checked ? "var(--text-muted)" : "var(--text-secondary)" }}>{label}</span>
+    </button>
   )
 }
 
 export function MorePage() {
-  const [copyLabel, setCopyLabel] = useState("\ud83d\udccb Copy to clipboard")
+  const [copyLabel, setCopyLabel] = useState("Copy to clipboard")
 
   function copyEmail() {
     navigator.clipboard.writeText(emailTemplate).then(() => {
-      setCopyLabel("\u2705 Copied!")
-      setTimeout(() => setCopyLabel("\ud83d\udccb Copy to clipboard"), 2000)
+      setCopyLabel("Copied!")
+      setTimeout(() => setCopyLabel("Copy to clipboard"), 2000)
     })
   }
 
   return (
     <div className="animate-fade-in">
-      <div className="font-display text-[28px] tracking-wider text-sp-text mb-4">More</div>
+      <h1 className="text-xl font-bold mb-5" style={{ color: "var(--text)" }}>More</h1>
 
-      {/* What to Bring */}
-      <div className="mb-6">
-        <div className="text-[10px] font-semibold tracking-[1.5px] uppercase text-sp-muted mb-2.5">What to Bring</div>
-        <div className="bg-sp-surface border border-sp-border rounded-sp p-4">
-          {packingList.map((section, si) => (
-            <div key={si} className={si < packingList.length - 1 ? "mb-5" : ""}>
-              <div className="text-[11px] font-semibold tracking-[1.5px] uppercase text-sp-muted mb-2">
-                {section.icon} {section.title}
-              </div>
-              {section.items.map((item, ii) => (
-                <CheckItem key={`${si}-${ii}`} id={`wi_${si}_${ii}`} label={item} />
-              ))}
-            </div>
-          ))}
-        </div>
+      {/* Packing List */}
+      <SectionLabel>What to Bring</SectionLabel>
+      <div className="rounded-xl p-4 mb-6" style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
+        {packingList.map((section, si) => (
+          <div key={si} className={si < packingList.length - 1 ? "mb-5" : ""}>
+            <div className="text-[11px] font-bold tracking-widest uppercase mb-1"
+              style={{ color: "var(--accent)" }}>{section.title}</div>
+            {section.items.map((item, ii) => (
+              <CheckItem key={`${si}-${ii}`} id={`wi_${si}_${ii}`} label={item} />
+            ))}
+          </div>
+        ))}
       </div>
 
       {/* Email Template */}
-      <div className="mb-6">
-        <div className="text-[10px] font-semibold tracking-[1.5px] uppercase text-sp-muted mb-2.5">Post-Show Follow-Up Email</div>
-        <div className="bg-sp-teal/10 border border-sp-teal/20 rounded-[10px] p-2.5 px-3.5 text-[13px] mb-3">
-          \ud83d\udce7 Send within <strong>10 business days</strong> of show close. Personalize the [brackets].
-        </div>
-        <div className="bg-sp-surface border border-sp-border rounded-sp p-4 text-[13px] leading-relaxed whitespace-pre-wrap">
-          {emailTemplate}
-        </div>
-        <button onClick={copyEmail}
-          className="bg-sp-surface2 border border-sp-border rounded-lg text-sp-text font-body text-[13px] font-medium py-2.5 px-4 cursor-pointer mt-2.5 w-full transition-colors active:border-sp-teal active:bg-sp-teal/10">
-          {copyLabel}
-        </button>
+      <SectionLabel>Follow-Up Email Template</SectionLabel>
+      <div className="rounded-xl p-3 mb-3 text-[13px]"
+        style={{ background: "var(--amber-light)", color: "var(--amber-fg)" }}>
+        <Mail size={14} className="inline mr-1.5" style={{ color: "var(--amber)" }} />
+        Send within <strong>10 business days</strong> of show close. Personalize the [brackets].
       </div>
+      <div className="rounded-xl p-4 text-[13px] leading-relaxed whitespace-pre-wrap mb-2"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+        {emailTemplate}
+      </div>
+      <button onClick={copyEmail}
+        className="w-full rounded-lg py-2.5 text-[13px] font-semibold cursor-pointer transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-[0.98]"
+        style={{ background: "var(--surface-alt)", border: "1px solid var(--border)", color: "var(--text)" }}>
+        <Copy size={14} /> {copyLabel}
+      </button>
 
-      {/* Load In Instructions */}
-      <div className="mb-6">
-        <div className="text-[10px] font-semibold tracking-[1.5px] uppercase text-sp-muted mb-2.5">Load In Instructions</div>
-        <div className="bg-sp-surface border border-sp-border rounded-sp p-4">
-          {[
-            { title: "1. Head to Marshalling Yard first", sub: "Do not drive directly to McCormick Place loading dock" },
-            { title: "2. Check in at Freeman desk", sub: "Bring Freeman confirmation + booth number" },
-            { title: "3. Follow floor markings to Booth #7365", sub: "North Building \u00b7 Booths 5500\u20139200" },
-            { title: "4. Booth must be set by May 15, 4:00pm" },
-          ].map((item, i) => (
-            <div key={i} className={`py-3 ${i < 3 ? "border-b border-sp-border" : ""}`}>
-              <div className="text-sm font-medium">{item.title}</div>
-              {item.sub && <div className="text-xs text-sp-muted mt-0.5">{item.sub}</div>}
-            </div>
-          ))}
-        </div>
-        <a href="https://maps.app.goo.gl/Ppvt3b72V9VGT1jc9" target="_blank" rel="noopener noreferrer"
-          className="flex items-center justify-between p-3.5 px-4 bg-sp-surface border border-sp-border rounded-sp mt-2 no-underline text-sp-text">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-sp-surface2 flex items-center justify-center text-lg">\ud83d\ude9b</div>
-            <div><div className="text-sm font-medium">Marshalling Yard</div><div className="text-xs text-sp-muted">Open in Maps</div></div>
+      {/* Load In */}
+      <SectionLabel className="mt-6">Load In</SectionLabel>
+      <div className="rounded-xl overflow-hidden mb-3"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+        {[
+          { title: "1. Head to Marshalling Yard first", sub: "Do not drive directly to loading dock" },
+          { title: "2. Check in at Freeman desk", sub: "Bring confirmation + booth number" },
+          { title: "3. Follow floor markings to #7365", sub: "North Building" },
+          { title: "4. Set up by May 15, 4:00pm" },
+        ].map((item, i) => (
+          <div key={i} className={`px-4 py-3 ${i < 3 ? "border-b" : ""}`} style={{ borderColor: "var(--border)" }}>
+            <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>{item.title}</div>
+            {item.sub && <div className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{item.sub}</div>}
           </div>
-          <span className="text-sp-muted text-lg">\u2192</span>
-        </a>
-
-        <div className="text-[10px] font-semibold tracking-[1.5px] uppercase text-sp-muted mt-4 mb-2.5">Load Out</div>
-        <div className="bg-sp-surface border border-sp-border rounded-sp p-4">
-          {[
-            { title: "Do NOT pack up before 3pm Tuesday", sub: "Early teardown = risk losing future show rights" },
-            { title: "Move-out window: May 19, 3:01pm \u2013 7:30pm" },
-            { title: "Continue May 20\u201321: 7:30am \u2013 4:30pm" },
-            { title: "All items cleared by May 21\u201322 noon" },
-          ].map((item, i) => (
-            <div key={i} className={`py-3 ${i < 3 ? "border-b border-sp-border" : ""}`}>
-              <div className="text-sm font-medium">{item.title}</div>
-              {item.sub && <div className="text-xs text-sp-muted mt-0.5">{item.sub}</div>}
-            </div>
-          ))}
+        ))}
+      </div>
+      <a href="https://maps.app.goo.gl/Ppvt3b72V9VGT1jc9" target="_blank" rel="noopener noreferrer"
+        className="flex items-center justify-between p-3.5 rounded-xl no-underline transition-all duration-200 mb-3 active:scale-[0.98]"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "var(--accent-light)" }}>
+            <Truck size={16} style={{ color: "var(--accent)" }} />
+          </div>
+          <div><div className="text-sm font-medium">Marshalling Yard</div><div className="text-xs" style={{ color: "var(--text-muted)" }}>Open in Maps</div></div>
         </div>
+        <ChevronRight size={16} style={{ color: "var(--text-muted)" }} />
+      </a>
+
+      <SectionLabel>Load Out</SectionLabel>
+      <div className="rounded-xl overflow-hidden mb-6"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+        {[
+          { title: "Do NOT pack up before 3pm Tuesday", sub: "Risk losing future show rights" },
+          { title: "Move-out: May 19, 3:01pm - 7:30pm" },
+          { title: "Continue May 20-21: 7:30am - 4:30pm" },
+          { title: "All items cleared by May 22 noon" },
+        ].map((item, i) => (
+          <div key={i} className={`px-4 py-3 ${i < 3 ? "border-b" : ""}`} style={{ borderColor: "var(--border)" }}>
+            <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>{item.title}</div>
+            {item.sub && <div className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{item.sub}</div>}
+          </div>
+        ))}
       </div>
 
-      {/* Key Links */}
-      <div className="mb-6">
-        <div className="text-[10px] font-semibold tracking-[1.5px] uppercase text-sp-muted mb-2.5">Key Links</div>
+      {/* Links */}
+      <SectionLabel>Key Links</SectionLabel>
+      <div className="space-y-2 mb-6">
         {moreLinks.map((link, i) => (
           <a key={i} href={link.href} target="_blank" rel="noopener noreferrer"
-            className="flex items-center justify-between p-3.5 px-4 bg-sp-surface border border-sp-border rounded-sp mb-2 no-underline text-sp-text transition-colors active:border-sp-teal-dim">
+            className="flex items-center justify-between p-3.5 rounded-xl no-underline transition-all duration-200 active:scale-[0.98]"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}>
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-sp-surface2 flex items-center justify-center text-lg">{link.icon}</div>
-              <div><div className="text-sm font-medium">{link.label}</div><div className="text-xs text-sp-muted">{link.sub}</div></div>
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "var(--accent-light)" }}>
+                <ExternalLink size={16} style={{ color: "var(--accent)" }} />
+              </div>
+              <div><div className="text-sm font-medium">{link.label}</div><div className="text-xs" style={{ color: "var(--text-muted)" }}>{link.sub}</div></div>
             </div>
-            <span className="text-sp-muted text-lg">\u2192</span>
+            <ChevronRight size={16} style={{ color: "var(--text-muted)" }} />
           </a>
         ))}
       </div>
 
       {/* Badge Pickup */}
-      <div className="mb-6">
-        <div className="text-[10px] font-semibold tracking-[1.5px] uppercase text-sp-muted mb-2.5">Badge Pickup</div>
-        <div className="bg-sp-surface border border-sp-border rounded-sp p-4 text-sm leading-relaxed">
-          <p>Badges are picked up on-site at McCormick Place registration.</p>
-          <p className="mt-2 text-sp-muted">Bring your exhibitor confirmation email. Each person picks up their own badge. 5 complimentary badges included for the first 100 sq ft + 3 per additional 100 sq ft.</p>
-        </div>
+      <SectionLabel>Badge Pickup</SectionLabel>
+      <div className="rounded-xl p-4 text-sm leading-relaxed"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+        <p>Badges picked up on-site at McCormick Place registration.</p>
+        <p className="mt-2" style={{ color: "var(--text-muted)" }}>Bring exhibitor confirmation email. 5 complimentary badges included for first 100 sq ft + 3 per additional 100 sq ft.</p>
       </div>
     </div>
   )
+}
+
+function SectionLabel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`text-[11px] font-bold tracking-widest uppercase mb-2.5 ${className}`} style={{ color: "var(--text-muted)" }}>{children}</div>
 }

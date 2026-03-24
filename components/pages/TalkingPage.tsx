@@ -1,13 +1,15 @@
 "use client"
 
+import { MessageCircle, Target, Shield, ArrowRight } from "lucide-react"
 import { openers, coreMessages, objections } from "@/lib/data"
 import type { TalkingPoint } from "@/lib/data"
 
 function TalkCard({ point }: { point: TalkingPoint }) {
   return (
-    <div className="bg-sp-surface border-l-[3px] border-l-sp-teal rounded-r-sp p-3.5 px-4 mb-2.5">
-      <div className="font-display text-[13px] text-sp-teal tracking-wider mb-1">{point.tag}</div>
-      <div className="text-sm leading-relaxed">{point.text}</div>
+    <div className="rounded-xl p-3.5 border-l-[3px] mb-2.5"
+      style={{ background: "var(--surface)", borderLeftColor: "var(--accent)", borderTop: "1px solid var(--border)", borderRight: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
+      <div className="text-[11px] font-bold tracking-widest uppercase mb-1" style={{ color: "var(--accent)" }}>{point.tag}</div>
+      <div className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>{point.text}</div>
     </div>
   )
 }
@@ -15,30 +17,40 @@ function TalkCard({ point }: { point: TalkingPoint }) {
 export function TalkingPage() {
   return (
     <div className="animate-fade-in">
-      <div className="font-display text-[28px] tracking-wider text-sp-text mb-4">At the Booth</div>
+      <h1 className="text-xl font-bold mb-4" style={{ color: "var(--text)" }}>Talking Points</h1>
 
-      <div className="bg-sp-teal/10 border border-sp-teal/20 rounded-[10px] p-2.5 px-3.5 text-[13px] mb-4">
-        Use these to open conversations. Keep it natural \u2014 you know this stuff. \ud83c\udfaf
+      <div className="rounded-xl p-3 mb-5 text-[13px]"
+        style={{ background: "var(--accent-light)", color: "var(--accent)" }}>
+        <Target size={14} className="inline mr-1.5" />
+        Use these to open conversations. Keep it natural.
       </div>
 
-      <div className="font-display text-lg tracking-wider text-sp-text mb-2.5">Opening Lines</div>
+      <Section icon={<MessageCircle size={16} />} title="Opening Lines" />
       {openers.map((p, i) => <TalkCard key={i} point={p} />)}
 
-      <div className="font-display text-lg tracking-wider text-sp-text mt-5 mb-2.5">Core Message</div>
+      <Section icon={<Target size={16} />} title="Core Message" className="mt-6" />
       {coreMessages.map((p, i) => <TalkCard key={i} point={p} />)}
 
-      <div className="font-display text-lg tracking-wider text-sp-text mt-5 mb-2.5">Objection Handling</div>
+      <Section icon={<Shield size={16} />} title="Objection Handling" className="mt-6" />
       {objections.map((p, i) => <TalkCard key={i} point={p} />)}
 
-      <div className="font-display text-lg tracking-wider text-sp-text mt-5 mb-2.5">Closing the Conversation</div>
+      <Section icon={<ArrowRight size={16} />} title="Closing" className="mt-6" />
       <TalkCard point={{ tag: "NEXT STEP", text: "Always end with a clear action: send a case study, book a follow-up call, or invite them to be a podcast guest. Scan their badge with lead retrieval and add a note immediately." }} />
 
-      <div className="font-display text-lg tracking-wider text-sp-text mt-5 mb-2.5">Mr. Potato Head \ud83e\udd54</div>
-      <div className="bg-sp-surface border border-sp-border rounded-sp p-4">
-        <p className="text-sm leading-relaxed">
-          Hide him somewhere different each day \u2014 creates a fun reason to come back. Or hide individual parts (glasses, mustache, hat) around the booth as a scavenger hunt. First to find all pieces wins a Joy of Ops mug. \ud83c\udfc6
-        </p>
+      <Section icon={<Target size={16} />} title="Mr. Potato Head" className="mt-6" />
+      <div className="rounded-xl p-4 text-sm leading-relaxed"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+        Hide him somewhere different each day - creates a fun reason to come back. Or hide individual parts around the booth as a scavenger hunt. First to find all pieces wins a Joy of Ops mug.
       </div>
+    </div>
+  )
+}
+
+function Section({ icon, title, className = "" }: { icon: React.ReactNode; title: string; className?: string }) {
+  return (
+    <div className={`flex items-center gap-2 mb-2.5 ${className}`}>
+      <span style={{ color: "var(--accent)" }}>{icon}</span>
+      <h2 className="text-base font-bold" style={{ color: "var(--text)" }}>{title}</h2>
     </div>
   )
 }

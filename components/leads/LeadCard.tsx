@@ -1,15 +1,21 @@
 "use client"
 
+import { X, Flame, Sun, Snowflake } from "lucide-react"
 import type { Lead } from "./useLeads"
 
-function heatIcon(heat: string) {
-  return heat === "hot" ? "Hot" : heat === "warm" ? "Warm" : "Cool"
-}
+function HeatBadge({ heat }: { heat: string }) {
+  const config = {
+    hot: { Icon: Flame, label: "Hot", bg: "var(--danger-light)", color: "var(--danger)" },
+    warm: { Icon: Sun, label: "Warm", bg: "var(--amber-light)", color: "var(--amber)" },
+    cool: { Icon: Snowflake, label: "Cool", bg: "var(--accent-light)", color: "var(--accent)" },
+  }[heat] ?? { Icon: Snowflake, label: "Cool", bg: "var(--accent-light)", color: "var(--accent)" }
 
-function heatBadgeClass(heat: string) {
-  if (heat === "hot") return "bg-sp-red/10 text-sp-red border-sp-red/30"
-  if (heat === "warm") return "bg-sp-amber/10 text-sp-amber border-sp-amber/30"
-  return "bg-sp-teal/10 text-sp-teal border-sp-teal/30"
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold"
+      style={{ background: config.bg, color: config.color }}>
+      <config.Icon size={11} /> {config.label}
+    </span>
+  )
 }
 
 interface LeadCardProps {
@@ -19,31 +25,33 @@ interface LeadCardProps {
 
 export function LeadCard({ lead, onDelete }: LeadCardProps) {
   return (
-    <div className="bg-sp-surface border border-sp-border rounded-sp p-3.5 px-4 mb-2.5 relative">
+    <div className="rounded-xl p-4"
+      style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
       <div className="flex items-start justify-between gap-2">
-        <div className="flex-1">
-          <div className="font-bold text-[15px]">{lead.name}</div>
+        <div className="flex-1 min-w-0">
+          <div className="font-bold text-[15px]" style={{ color: "var(--text)" }}>{lead.name}</div>
           {lead.company && (
-            <div className="text-[13px] text-sp-muted mt-0.5">
+            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-muted)" }}>
               {lead.company}{lead.role ? " \u00b7 " + lead.role : ""}
             </div>
           )}
-          {lead.contact && <div className="text-xs text-sp-teal mt-1">{lead.contact}</div>}
+          {lead.contact && <div className="text-xs mt-1 font-medium" style={{ color: "var(--accent)" }}>{lead.contact}</div>}
         </div>
-        <button onClick={() => onDelete(lead.id)} className="bg-transparent border-none text-sp-muted text-lg cursor-pointer px-1.5 py-0.5 flex-shrink-0">
-          \u00d7
+        <button onClick={() => onDelete(lead.id)} aria-label="Delete lead"
+          className="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer flex-shrink-0 transition-colors duration-200"
+          style={{ background: "var(--surface-alt)", border: "1px solid var(--border)", color: "var(--text-muted)" }}>
+          <X size={14} />
         </button>
       </div>
       {lead.notes && (
-        <div className="text-[13px] text-sp-text mt-2 pt-2 border-t border-sp-border opacity-80">
+        <div className="text-[13px] mt-2.5 pt-2.5 border-t leading-relaxed"
+          style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}>
           {lead.notes}
         </div>
       )}
-      <div className="flex items-center gap-2 mt-2">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${heatBadgeClass(lead.heat)}`}>
-          {heatIcon(lead.heat)} {lead.heat.charAt(0).toUpperCase() + lead.heat.slice(1)}
-        </span>
-        <span className="text-[11px] text-sp-muted">{lead.time}</span>
+      <div className="flex items-center gap-2 mt-2.5">
+        <HeatBadge heat={lead.heat} />
+        <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{lead.time}</span>
       </div>
     </div>
   )

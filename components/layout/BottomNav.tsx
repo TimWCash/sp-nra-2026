@@ -1,7 +1,7 @@
 "use client"
 
 import {
-  Home, Calendar, Briefcase, Users, MessageSquare, UserPlus, MoreHorizontal,
+  Home, Calendar, Briefcase, Users, MessageCircle, UserPlus, MoreHorizontal,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -12,7 +12,7 @@ const tabs: { id: PageId; label: string; icon: typeof Home }[] = [
   { id: "schedule", label: "Schedule", icon: Calendar },
   { id: "booth", label: "Booth", icon: Briefcase },
   { id: "team", label: "Team", icon: Users },
-  { id: "talk", label: "Talking", icon: MessageSquare },
+  { id: "talk", label: "Talk", icon: MessageCircle },
   { id: "leads", label: "Leads", icon: UserPlus },
   { id: "more", label: "More", icon: MoreHorizontal },
 ]
@@ -24,8 +24,9 @@ interface BottomNavProps {
 
 export function BottomNav({ active, onChange }: BottomNavProps) {
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[100] border-t border-sp-border flex pb-[env(safe-area-inset-bottom,0px)]"
-      style={{ background: "var(--bg)", borderTop: "1px solid var(--border)" }}>
+    <nav className="fixed bottom-0 left-0 right-0 z-[100] border-t flex pb-[env(safe-area-inset-bottom,0px)]"
+      style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "0 -1px 8px rgba(0,0,0,0.04)" }}
+      aria-label="Main navigation">
       {tabs.map((tab) => {
         const Icon = tab.icon
         const isActive = active === tab.id
@@ -34,15 +35,21 @@ export function BottomNav({ active, onChange }: BottomNavProps) {
             key={tab.id}
             onClick={() => onChange(tab.id)}
             className={cn(
-              "flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 bg-transparent border-none cursor-pointer transition-colors font-body text-[10px] font-medium",
-              isActive ? "text-sp-teal" : "text-sp-muted"
+              "flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[52px] bg-transparent border-none cursor-pointer transition-colors duration-200 text-[10px] font-semibold relative"
             )}
+            style={{ color: isActive ? "var(--accent)" : "var(--text-muted)" }}
+            aria-label={tab.label}
+            aria-current={isActive ? "page" : undefined}
           >
-            <Icon size={20} className={isActive ? "drop-shadow-[0_0_4px_rgba(79,168,166,0.3)]" : ""} />
+            {isActive && (
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full"
+                style={{ background: "var(--accent)" }} />
+            )}
+            <Icon size={20} strokeWidth={isActive ? 2.25 : 1.75} />
             {tab.label}
           </button>
         )
       })}
-    </div>
+    </nav>
   )
 }

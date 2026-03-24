@@ -1,14 +1,26 @@
 "use client"
 
-export function Ticker() {
-  const text = "\u26a1 BOOTH #7365 \u00b7 North Building \u00b7 20\u00d710 Inline \u00b7 Show opens 9:30am daily \u00a0\u00a0\u00a0\u00a0\u00a0 \ud83d\udccd McCormick Place, Chicago IL \u00a0\u00a0\u00a0\u00a0\u00a0 \ud83c\udf99 Podcast setup live \u00b7 Joy of Ops neon on \u00a0\u00a0\u00a0\u00a0\u00a0 \u2705 Show closes 3pm TUESDAY \u2014 early teardown strictly prohibited"
+import { MapPin, Radio, Clock } from "lucide-react"
 
+export function Ticker() {
   return (
-    <div className="fixed top-14 left-0 right-0 z-[99] bg-sp-teal/10 border-b border-sp-teal/25 py-1.5 px-4 text-[11px] text-sp-teal font-medium overflow-hidden whitespace-nowrap">
-      <div className="ticker-animate inline-block">
-        <span>{text}</span>
-        <span className="ml-16">{text}</span>
+    <div className="fixed top-14 left-0 right-0 z-[99] py-2 px-4 overflow-hidden whitespace-nowrap text-xs font-medium"
+      style={{ background: "var(--accent-light)", borderBottom: "1px solid var(--border)", color: "var(--accent)" }}>
+      <div className="ticker-animate inline-flex items-center gap-6">
+        <TickerContent />
+        <TickerContent />
       </div>
     </div>
+  )
+}
+
+function TickerContent() {
+  return (
+    <span className="inline-flex items-center gap-6">
+      <span className="inline-flex items-center gap-1.5"><MapPin size={12} /> Booth #7365 &middot; North Building &middot; 20&times;10 Inline</span>
+      <span className="inline-flex items-center gap-1.5"><Radio size={12} /> Podcast recording live during show hours</span>
+      <span className="inline-flex items-center gap-1.5"><Clock size={12} /> Show closes 3pm Tuesday &mdash; no early teardown</span>
+      <span className="ml-8" />
+    </span>
   )
 }

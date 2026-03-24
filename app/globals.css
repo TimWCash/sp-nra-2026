@@ -1,57 +1,97 @@
 @import "tailwindcss";
 
-/* ── THEME VARIABLES ── */
-:root {
-  --bg: #0b1a22;
-  --surface: #122130;
-  --surface2: #1a2f3e;
-  --border: #1e3545;
-  --teal: #4fa8a6;
-  --teal-dim: #3d8381;
-  --teal-dark: #1c3440;
-  --amber: #ec9f35;
-  --amber-dim: #c8873a;
-  --red: #e05252;
-  --green: #3ecf7a;
-  --text: #eef4f6;
-  --muted: #6b8fa0;
-  --radius: 12px;
+/* ══════════════════════════════════════════
+   SERVICE PHYSICS — DESIGN SYSTEM TOKENS
+   Trust & Authority · Professional Consulting
+   Light mode primary · 4.5:1 contrast minimum
+   ══════════════════════════════════════════ */
 
+:root {
+  /* ── Brand Palette ── */
+  --brand-teal:   #2d8f8d;
+  --brand-navy:   #1c3440;
+  --brand-amber:  #ec9f35;
+  --brand-white:  #ffffff;
+
+  /* ── Semantic Colors (Light Mode Default) ── */
+  --bg:           #f7f9fb;
+  --surface:      #ffffff;
+  --surface-alt:  #f0f4f7;
+  --border:       #d9e2e8;
+  --border-strong: #b8c9d1;
+
+  --text:         #1c3440;
+  --text-secondary: #4a6775;
+  --text-muted:   #7a9aaa;
+
+  --accent:       #2d8f8d;
+  --accent-hover: #257775;
+  --accent-light: #e8f4f3;
+  --accent-fg:    #ffffff;
+
+  --amber:        #ec9f35;
+  --amber-light:  #fdf3e3;
+  --amber-fg:     #6b4106;
+
+  --success:      #1a8a4a;
+  --success-light: #e6f7ee;
+  --danger:       #c5392f;
+  --danger-light: #fde8e8;
+
+  --shadow-sm:    0 1px 2px rgba(28, 52, 64, 0.06);
+  --shadow-md:    0 2px 8px rgba(28, 52, 64, 0.08);
+  --shadow-lg:    0 4px 16px rgba(28, 52, 64, 0.10);
+
+  --radius-sm:    6px;
+  --radius-md:    10px;
+  --radius-lg:    14px;
+  --radius-full:  9999px;
+
+  /* ── shadcn compat ── */
   --background: var(--bg);
   --foreground: var(--text);
-  --primary: var(--teal);
-  --primary-foreground: #0b1a22;
-  --secondary: var(--surface2);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-fg);
+  --secondary: var(--surface-alt);
   --secondary-foreground: var(--text);
-  --accent: var(--surface2);
-  --accent-foreground: var(--text);
-  --destructive: var(--red);
+  --destructive: var(--danger);
   --destructive-foreground: #ffffff;
-  --ring: var(--teal);
+  --ring: var(--accent);
   --input: var(--border);
 }
 
-[data-theme="light"] {
-  --bg: #f0f5f6;
-  --surface: #ffffff;
-  --surface2: #e6eef0;
-  --border: #cddde2;
-  --teal: #2e8a87;
-  --teal-dim: #246e6c;
-  --teal-dark: #1c3440;
-  --amber: #c8873a;
-  --amber-dim: #a86e2e;
-  --red: #cc3333;
-  --green: #1f9e57;
-  --text: #0d2535;
-  --muted: #5a7d8e;
+/* ── Dark Mode ── */
+[data-theme="dark"] {
+  --bg:           #0f1c24;
+  --surface:      #162530;
+  --surface-alt:  #1c3040;
+  --border:       #253e4d;
+  --border-strong: #34576a;
 
-  --background: var(--bg);
-  --foreground: var(--text);
-  --primary: var(--teal);
-  --primary-foreground: #ffffff;
+  --text:         #e8f0f4;
+  --text-secondary: #9ab5c3;
+  --text-muted:   #6b8fa0;
+
+  --accent:       #3db5b2;
+  --accent-hover: #50c8c5;
+  --accent-light: #1a3a3d;
+  --accent-fg:    #0f1c24;
+
+  --amber:        #ec9f35;
+  --amber-light:  #2e2514;
+  --amber-fg:     #fde8c0;
+
+  --success:      #3ecf7a;
+  --success-light: #112e1e;
+  --danger:       #e05252;
+  --danger-light: #2e1414;
+
+  --shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md:    0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-lg:    0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
+/* ── Tailwind v4 Theme Tokens ── */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -59,65 +99,88 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted);
+  --color-muted: var(--text-muted);
+  --color-muted-foreground: var(--text-muted);
   --color-border: var(--border);
   --color-ring: var(--ring);
   --color-input: var(--input);
 
-  --color-sp-bg: var(--bg);
-  --color-sp-surface: var(--surface);
-  --color-sp-surface2: var(--surface2);
-  --color-sp-border: var(--border);
-  --color-sp-teal: var(--teal);
-  --color-sp-teal-dim: var(--teal-dim);
-  --color-sp-teal-dark: var(--teal-dark);
-  --color-sp-amber: var(--amber);
-  --color-sp-amber-dim: var(--amber-dim);
-  --color-sp-red: var(--red);
-  --color-sp-green: var(--green);
-  --color-sp-text: var(--text);
-  --color-sp-muted: var(--muted);
+  --color-sp-bg:          var(--bg);
+  --color-sp-surface:     var(--surface);
+  --color-sp-surface-alt: var(--surface-alt);
+  --color-sp-border:      var(--border);
+  --color-sp-border-strong: var(--border-strong);
+  --color-sp-text:        var(--text);
+  --color-sp-text-sec:    var(--text-secondary);
+  --color-sp-muted:       var(--text-muted);
+  --color-sp-accent:      var(--accent);
+  --color-sp-accent-hover: var(--accent-hover);
+  --color-sp-accent-light: var(--accent-light);
+  --color-sp-accent-fg:   var(--accent-fg);
+  --color-sp-amber:       var(--amber);
+  --color-sp-amber-light: var(--amber-light);
+  --color-sp-success:     var(--success);
+  --color-sp-success-light: var(--success-light);
+  --color-sp-danger:      var(--danger);
+  --color-sp-danger-light: var(--danger-light);
 
-  --radius-sp: var(--radius);
-  --font-display: "Bebas Neue", sans-serif;
-  --font-body: "Nunito Sans", sans-serif;
+  --font-body: "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
+/* ── Base Reset ── */
 * {
   -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
 }
 
 body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: contain;
 }
 
-/* ── TICKER ANIMATION ── */
+/* ── Focus styles ── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Ticker ── */
 @keyframes ticker-scroll {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
-
 .ticker-animate {
   animation: ticker-scroll 30s linear infinite;
 }
+@media (prefers-reduced-motion: reduce) {
+  .ticker-animate { animation: none; }
+}
 
-/* ── FADE IN ── */
+/* ── Page fade ── */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
 .animate-fade-in {
-  animation: fadeIn 0.2s ease;
+  animation: fadeIn 0.25s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in { animation: none; }
 }
 
-/* ── SCROLLBAR HIDE ── */
+/* ── Scrollbar hide ── */
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { scrollbar-width: none; }
