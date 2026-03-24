@@ -13,6 +13,7 @@ export interface Lead {
   notes: string
   heat: HeatLevel
   time: string
+  badgePhoto?: string
 }
 
 const STORAGE_KEY = "sp_nra_leads"

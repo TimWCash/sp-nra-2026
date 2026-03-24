@@ -1,6 +1,6 @@
 "use client"
 
-import { X, Flame, Sun, Snowflake } from "lucide-react"
+import { X, Flame, Sun, Snowflake, Image as ImageIcon } from "lucide-react"
 import type { Lead } from "./useLeads"
 
 function HeatBadge({ heat }: { heat: string }) {
@@ -43,6 +43,11 @@ export function LeadCard({ lead, onDelete }: LeadCardProps) {
           <X size={14} />
         </button>
       </div>
+      {lead.badgePhoto && (
+        <div className="mt-2.5 rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+          <img src={lead.badgePhoto} alt={`${lead.name} badge`} className="w-full max-h-[160px] object-cover" />
+        </div>
+      )}
       {lead.notes && (
         <div className="text-[13px] mt-2.5 pt-2.5 border-t leading-relaxed"
           style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}>
