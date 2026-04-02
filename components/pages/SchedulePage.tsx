@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Clock, AlertTriangle, CircleDot, Search, Map, GraduationCap, ChefHat, Wine, Lightbulb, Eye, Route, PartyPopper, ExternalLink, X, CalendarPlus, MapPin, Star, ChevronRight } from "lucide-react"
 import { schedule, dayTabs } from "@/lib/data"
 import { nraSessions, sessionCategories, type Session } from "@/lib/sessions"
@@ -149,6 +149,16 @@ function getDuration(timeStr: string): string {
   return rem > 0 ? `${hours}h ${rem}m` : `${hours}h`
 }
 
+const USER_STARS_KEY = "sp_user_starred_sessions"
+
+function loadUserStars(): Set<string> {
+  if (typeof window === "undefined") return new Set()
+  try { return new Set(JSON.parse(localStorage.getItem(USER_STARS_KEY) || "[]")) } catch { return new Set() }
+}
+function saveUserStars(s: Set<string>) {
+  localStorage.setItem(USER_STARS_KEY, JSON.stringify([...s]))
+}
+
 export function SchedulePage() {
   const [activeDay, setActiveDay] = useState("fri")
   const [view, setView] = useState<ViewMode>("team")
@@ -156,10 +166,22 @@ export function SchedulePage() {
   const [search, setSearch] = useState("")
   const [selectedSession, setSelectedSession] = useState<{ session: Session; dayKey: string } | null>(null)
   const [calMenuOpen, setCalMenuOpen] = useState(false)
+  const [userStars, setUserStars] = useState<Set<string>>(new Set())
+
+  useEffect(() => { setUserStars(loadUserStars()) }, [])
+
+  function toggleStar(e: React.MouseEvent, sessionId: string) {
+    e.stopPropagation()
+    const next = new Set(userStars)
+    next.has(sessionId) ? next.delete(sessionId) : next.add(sessionId)
+    setUserStars(next)
+    saveUserStars(next)
+  }
 
   const filteredSessions = (nraSessions[activeDay] || []).filter((s: Session) => {
     if (filter === "spPick" && !s.spPick) return false
-    else if (filter !== "all" && filter !== "spPick" && s.category !== filter) return false
+    if (filter === "myStars" && !userStars.has(s.title)) return false
+    else if (filter !== "all" && filter !== "spPick" && filter !== "myStars" && s.category !== filter) return false
     if (search && !s.title.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
@@ -335,6 +357,15 @@ export function SchedulePage() {
                 {c.label}
               </button>
             ))}
+            <button onClick={() => setFilter("myStars")}
+              className="flex-shrink-0 py-1.5 px-3 rounded-full text-[11px] font-semibold cursor-pointer transition-all duration-200"
+              style={{
+                background: filter === "myStars" ? "var(--amber)" : "var(--surface)",
+                color: filter === "myStars" ? "#fff" : "var(--text-secondary)",
+                border: `1px solid ${filter === "myStars" ? "var(--amber)" : "var(--border)"}`,
+              }}>
+              ☆ My Sessions{userStars.size > 0 ? ` (${userStars.size})` : ""}
+            </button>
           </div>
 
           {/* Count */}
@@ -370,7 +401,20 @@ export function SchedulePage() {
                         {session.location}
                       </div>
                     </div>
-                    <ChevronRight size={16} className="flex-shrink-0 mt-1" style={{ color: "var(--text-muted)", opacity: 0.5 }} />
+                    <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                      <button
+                        onClick={(e) => toggleStar(e, session.title)}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 active:scale-90"
+                        style={{ background: "transparent", border: "none" }}
+                        title={userStars.has(session.title) ? "Remove from My Sessions" : "Add to My Sessions"}>
+                        <Star
+                          size={16}
+                          fill={userStars.has(session.title) ? "var(--amber)" : "none"}
+                          style={{ color: userStars.has(session.title) ? "var(--amber)" : "var(--text-muted)", opacity: userStars.has(session.title) ? 1 : 0.4 }}
+                        />
+                      </button>
+                      <ChevronRight size={16} style={{ color: "var(--text-muted)", opacity: 0.5 }} />
+                    </div>
                   </div>
                 </button>
               )
