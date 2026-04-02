@@ -1,7 +1,7 @@
 "use client"
 
 import {
-  Home, Calendar, Briefcase, UserPlus, MoreHorizontal,
+  Home, Calendar, Users, UserPlus, MoreHorizontal,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -11,7 +11,7 @@ const tabs: { id: PageId; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Home", icon: Home },
   { id: "schedule", label: "Schedule", icon: Calendar },
   { id: "leads", label: "Leads", icon: UserPlus },
-  { id: "booth", label: "Booth", icon: Briefcase },
+  { id: "status", label: "Team", icon: Users },
   { id: "more", label: "More", icon: MoreHorizontal },
 ]
 

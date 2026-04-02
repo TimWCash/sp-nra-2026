@@ -57,6 +57,7 @@ export const dayTabs = [
 export interface TeamMember {
   name: string
   initials: string
+  photo?: string
   flights?: { label: string; detail: string }[]
   notes?: string[]
   linkedin?: string
@@ -67,45 +68,45 @@ export const team: TeamMember[] = [
     name: "Brian",
     initials: "B",
     flights: [
-      { label: "\u2708\ufe0f SYR \u2192 ORD", detail: "May 15 \u00b7 10:36am \u00b7 UA5964 Seat 7B" },
-      { label: "\u2708\ufe0f ORD \u2192 SYR", detail: "May 20 \u00b7 10:35am" },
+      { label: "✈️ SYR → ORD", detail: "May 15 · 10:36am · UA5964 Seat 7B" },
+      { label: "✈️ ORD → SYR", detail: "May 20 · 10:35am" },
     ],
-    notes: ["\ud83c\udfe0 Airbnb"],
+    notes: ["🏠 Airbnb"],
     linkedin: "https://www.linkedin.com/in/brianholmgren/",
   },
   {
     name: "Rebecca",
     initials: "R",
+    photo: "/team/rebecca.jpg",
     flights: [
-      { label: "\u2708\ufe0f DFW \u2192 ORD", detail: "May 15 \u00b7 7:00am \u00b7 AA1120 \u00b7 Arrives 9:27am" },
-      { label: "\u2708\ufe0f ORD \u2192 DFW", detail: "May 20 \u00b7 8:15am \u00b7 AA481 \u00b7 Arrives 10:53am" },
+      { label: "✈️ DFW → ORD", detail: "May 15 · 7:00am · AA1120 · Arrives 9:27am" },
+      { label: "✈️ ORD → DFW", detail: "May 20 · 8:15am · AA481 · Arrives 10:53am" },
     ],
-    // LinkedIn TBD
   },
   {
     name: "Maria",
     initials: "M",
+    photo: "/team/maria.jpg",
     flights: [
-      { label: "\u2708\ufe0f EZE \u2192 ORD", detail: "May 14 \u00b7 9:00am" },
-      { label: "\u2708\ufe0f ORD \u2192 EZE", detail: "May 20 \u00b7 2:40pm" },
+      { label: "✈️ EZE → ORD", detail: "May 14 · 9:00am" },
+      { label: "✈️ ORD → EZE", detail: "May 20 · 2:40pm" },
     ],
-    notes: ["\ud83c\udfe0 Airbnb"],
-    // LinkedIn TBD
+    notes: ["🏠 Airbnb"],
   },
   {
     name: "Steve",
     initials: "S",
-    notes: ["\ud83d\ude97 Driving to Chicago", "\ud83c\udfe0 Airbnb"],
+    notes: ["🚗 Driving to Chicago", "🏠 Airbnb"],
     linkedin: "https://www.linkedin.com/in/steve-nghe/",
   },
   {
     name: "Kelly",
     initials: "K",
+    photo: "/team/kelly.jpg",
     flights: [
-      { label: "\u2708\ufe0f DFW \u2192 ORD", detail: "May 15 \u00b7 9:30am" },
-      { label: "\u2708\ufe0f ORD \u2192 DFW", detail: "May 19 \u00b7 8:35pm" },
+      { label: "✈️ DFW → ORD", detail: "May 15 · 9:30am" },
+      { label: "✈️ ORD → DFW", detail: "May 19 · 8:35pm" },
     ],
-    // LinkedIn TBD
   },
 ]
 

@@ -20,10 +20,16 @@ export function TeamPage() {
         {team.map((person) => (
           <div key={person.name} className="rounded-xl p-4 flex items-start gap-3.5"
             style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
-            <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
-              style={{ background: "var(--accent-light)", color: "var(--accent)" }}>
-              {person.initials}
-            </div>
+            {person.photo ? (
+              <img src={person.photo} alt={person.name}
+                className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                style={{ border: "2px solid var(--border)" }} />
+            ) : (
+              <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
+                style={{ background: "var(--accent-light)", color: "var(--accent)", border: "2px solid var(--accent)" }}>
+                {person.initials}
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <div className="font-bold text-[15px]" style={{ color: "var(--text)" }}>{person.name}</div>
               {person.flights?.map((f, i) => (
