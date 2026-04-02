@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { TopBar } from "@/components/layout/TopBar"
 import { BottomNav, type PageId } from "@/components/layout/BottomNav"
+import { OnboardingModal } from "@/components/OnboardingModal"
 import { HomePage } from "@/components/pages/HomePage"
 import { SchedulePage } from "@/components/pages/SchedulePage"
 import { BoothPage } from "@/components/pages/BoothPage"
@@ -39,6 +40,7 @@ export default function App() {
 
   return (
     <>
+      <OnboardingModal />
       <TopBar />
       <main className="pt-[64px] px-4 pb-[90px] min-h-screen">
         <PageComponent onNavigate={navigate} />

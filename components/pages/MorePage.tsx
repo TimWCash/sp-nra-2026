@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Copy, Mail, Users, MessageCircle, Mic, Activity, Truck, ChevronRight } from "lucide-react"
+import { Copy, Mail, Users, MessageCircle, Mic, Activity, Truck, ChevronRight, HelpCircle, ChevronDown } from "lucide-react"
 import { keyDates, emailTemplate } from "@/lib/data"
 import type { PageId } from "@/components/layout/BottomNav"
 
@@ -16,8 +16,48 @@ interface MorePageProps {
   onNavigate?: (page: PageId) => void
 }
 
+const HOW_TO: { q: string; a: string }[] = [
+  {
+    q: "How do I capture a lead?",
+    a: "Tap Leads in the bottom nav → tap the + button → fill in what you know (even just a name is fine) → pick who's logging it → set the heat level → Save. It syncs to Google Sheets automatically.",
+  },
+  {
+    q: "How do I snap a badge photo?",
+    a: "In the lead form, tap 'Snap badge photo' — it opens your camera pointed outward. Snap the attendee's badge and it gets saved with the lead.",
+  },
+  {
+    q: "How does the Bat Signal work?",
+    a: "Go to Team (bottom nav) → tap the 🦇 BAT SIGNAL button. It instantly alerts everyone who has the app open. If they've enabled push notifications, it pops up on their locked screen too.",
+  },
+  {
+    q: "How do I enable push notifications?",
+    a: "Go to Team → tap 'Enable push alerts for Bat Signal' → allow when your phone asks. You only need to do this once. You'll see a green checkmark when it's on.",
+  },
+  {
+    q: "How do I install this as an app?",
+    a: "In Safari: tap the Share icon → 'Add to Home Screen' → Add. In Chrome: tap the 3-dot menu → 'Add to Home Screen'. Once installed, it works offline and push notifications work.",
+  },
+  {
+    q: "How do I book a podcast guest?",
+    a: "Go to More → Podcast (or tap Podcast in the quick nav). Pick an open 15-minute slot, enter the guest's info, and tap Confirm. They'll appear on the schedule.",
+  },
+  {
+    q: "How do I update my team status?",
+    a: "Go to Team → tap your card to cycle through: At Booth → On Break → Walking Floor → In Meeting → Off. Everyone with the app open will see your status.",
+  },
+  {
+    q: "How do I add a session to my calendar?",
+    a: "Go to Schedule → NRA Sessions tab → tap any session → tap 'Add to Calendar'. Choose Google Calendar or download the .ics file for Outlook.",
+  },
+  {
+    q: "Does it work without WiFi?",
+    a: "Yes — once you've opened the app at least once, the core content (schedule, talking points, booth info, load-in guide) is cached and works offline. Lead capture saves locally and syncs when you're back online.",
+  },
+]
+
 export function MorePage({ onNavigate }: MorePageProps) {
   const [copyLabel, setCopyLabel] = useState("Copy to clipboard")
+  const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   function copyEmail() {
     navigator.clipboard.writeText(emailTemplate).then(() => {
@@ -29,6 +69,33 @@ export function MorePage({ onNavigate }: MorePageProps) {
   return (
     <div className="animate-fade-in">
       <h1 className="text-xl font-bold mb-4" style={{ color: "var(--text)" }}>More</h1>
+
+      {/* How To Use */}
+      <SectionLabel>How to Use This App</SectionLabel>
+      <div className="rounded-xl overflow-hidden mb-6"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
+        {HOW_TO.map((item, i) => (
+          <div key={i} style={{ borderBottom: i < HOW_TO.length - 1 ? "1px solid var(--border)" : "none" }}>
+            <button
+              onClick={() => setOpenIndex(openIndex === i ? null : i)}
+              className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left cursor-pointer bg-transparent border-0"
+            >
+              <div className="flex items-center gap-2.5">
+                <HelpCircle size={14} className="flex-shrink-0" style={{ color: "var(--accent)" }} />
+                <span className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>{item.q}</span>
+              </div>
+              <ChevronDown size={14} className="flex-shrink-0 transition-transform duration-200"
+                style={{ color: "var(--text-muted)", transform: openIndex === i ? "rotate(180deg)" : "rotate(0deg)" }} />
+            </button>
+            {openIndex === i && (
+              <div className="px-4 pb-4 text-[13px] leading-relaxed"
+                style={{ color: "var(--text-secondary)" }}>
+                {item.a}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
 
       {/* Quick Nav */}
       <div className="space-y-1.5 mb-6">
