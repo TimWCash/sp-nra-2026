@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server"
+import { pushStore } from "@/lib/pushStore"
+import webpush from "web-push"
 
-// Module-level state — persists across requests on the same warm instance
-// Good enough for a 4-day trade show with 5 users
+webpush.setVapidDetails(
+  process.env.VAPID_MAILTO || "mailto:tim@servicephysics.com",
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "",
+  process.env.VAPID_PRIVATE_KEY || ""
+)
+
 let batSignalState = { active: false, since: 0 }
 
 export async function GET() {
@@ -16,5 +22,21 @@ export async function POST(req: Request) {
     active: !!body.active,
     since: body.active ? Date.now() : 0,
   }
-  return NextResponse.json(batSignalState)
+
+  // Fire push notifications to all subscribed devices when activating
+  if (body.active && pushStore.size > 0) {
+    const payload = JSON.stringify({
+      title: "🦇 BAT SIGNAL",
+      body: "Booth #7365 is SLAMMED — get back now!",
+    })
+    const sends = Array.from(pushStore.values()).map((sub) =>
+      webpush.sendNotification(sub as webpush.PushSubscription, payload).catch(() => {
+        // Remove dead subscriptions
+        pushStore.delete((sub as webpush.PushSubscription).endpoint)
+      })
+    )
+    await Promise.all(sends)
+  }
+
+  return NextResponse.json({ ...batSignalState, pushed: pushStore.size })
 }

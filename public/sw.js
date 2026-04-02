@@ -1,4 +1,4 @@
-const CACHE = "sp-nra-2026-v1"
+const CACHE = "sp-nra-2026-v2"
 
 const PRECACHE = [
   "/",
@@ -24,10 +24,8 @@ self.addEventListener("activate", (event) => {
 })
 
 self.addEventListener("fetch", (event) => {
-  // Only handle GET requests for same-origin or CDN assets
   if (event.request.method !== "GET") return
   const url = new URL(event.request.url)
-  // Skip Google Sheets sync calls — always go network
   if (url.hostname.includes("script.google.com")) return
 
   event.respondWith(
@@ -41,9 +39,40 @@ self.addEventListener("fetch", (event) => {
           return response
         })
         .catch(() => cached)
-
-      // Network first, fall back to cache
       return networkFetch || cached
+    })
+  )
+})
+
+// ── PUSH NOTIFICATIONS ──
+self.addEventListener("push", (event) => {
+  let data = { title: "🦇 BAT SIGNAL", body: "Booth #7365 needs backup — get there now!" }
+  try {
+    if (event.data) data = event.data.json()
+  } catch {}
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "/icon-192.svg",
+      badge: "/icon-192.svg",
+      tag: "bat-signal",
+      renotify: true,
+      requireInteraction: true,
+      vibrate: [200, 100, 200, 100, 200],
+      data: { url: "/?page=status" },
+    })
+  )
+})
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close()
+  event.waitUntil(
+    clients.matchAll({ type: "window" }).then((clientList) => {
+      for (const client of clientList) {
+        if ("focus" in client) return client.focus()
+      }
+      if (clients.openWindow) return clients.openWindow("/")
     })
   )
 })

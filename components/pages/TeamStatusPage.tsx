@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Users, Target, CheckCircle } from "lucide-react"
 import { team as teamData } from "@/lib/data"
+import { NotificationPermission } from "@/components/NotificationPermission"
 
 type MemberStatus = "at-booth" | "on-break" | "walking" | "in-meeting" | "off"
 
@@ -168,6 +169,9 @@ export function TeamStatusPage() {
           </button>
         </div>
       )}
+
+      {/* ── NOTIFICATION PERMISSION ── */}
+      <NotificationPermission />
 
       {/* ── BAT SIGNAL BUTTON ── */}
       {!batSignal.active && (
