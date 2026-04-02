@@ -4,9 +4,15 @@ export interface ScheduleEvent {
   title: string
   sub?: string
   highlight?: "open" | "close" | "close-final"
+  link?: { url: string; label: string }
 }
 
 export const schedule: Record<string, ScheduleEvent[]> = {
+  fri: [
+    { time: "Arrive", title: "Team arrives in Chicago", sub: "Check in to Airbnb · Settle in" },
+    { time: "4:00pm", title: "Prosper Accelerator Welcome Mixer", sub: "Middleby Showroom · 222 W Merchandise Mart Plaza · Free networking with foodservice leaders", highlight: "open", link: { url: "https://www.eventbrite.com/e/prosper-accelerator-welcome-mixer-tickets-1936131705049", label: "Register on Eventbrite" } },
+    { time: "6:00pm", title: "Mixer ends", sub: "Team dinner · Final prep for tomorrow" },
+  ],
   sat: [
     { time: "9:00am", title: "Pre-Show Team Meeting", sub: "Review goals, booth assignments, talking points" },
     { time: "9:30am", title: "SHOW FLOOR OPENS", sub: "All hands on deck at Booth #7365", highlight: "open" },
@@ -35,11 +41,12 @@ export const schedule: Record<string, ScheduleEvent[]> = {
     { time: "9:30am", title: "SHOW FLOOR OPENS (LAST DAY)", highlight: "open" },
     { time: "3:00pm", title: "SHOW OFFICIALLY CLOSES", sub: "Do NOT teardown before this time", highlight: "close-final" },
     { time: "3:01pm", title: "Exhibitor Move-Out Begins", sub: "3:01pm \u2013 7:30pm move-out window" },
-    { time: "Kelly", title: "\u2708\ufe0f Kelly: ORD \u2192 DFW 8:35pm" },
+    { time: "8:35pm", title: "\u2708\ufe0f Kelly: ORD \u2192 DFW" },
   ],
 }
 
 export const dayTabs = [
+  { key: "fri", label: "Fri May 15" },
   { key: "sat", label: "Sat May 16" },
   { key: "sun", label: "Sun May 17" },
   { key: "mon", label: "Mon May 18" },
@@ -73,7 +80,7 @@ export const team: TeamMember[] = [
       { label: "\u2708\ufe0f DFW \u2192 ORD", detail: "May 15 \u00b7 7:00am \u00b7 AA1120 \u00b7 Arrives 9:27am" },
       { label: "\u2708\ufe0f ORD \u2192 DFW", detail: "May 20 \u00b7 8:15am \u00b7 AA481 \u00b7 Arrives 10:53am" },
     ],
-    linkedin: "https://sites.google.com/view/servicephysicsnra2026/rebecca-linkedin",
+    // LinkedIn TBD
   },
   {
     name: "Maria",
@@ -83,7 +90,7 @@ export const team: TeamMember[] = [
       { label: "\u2708\ufe0f ORD \u2192 EZE", detail: "May 20 \u00b7 2:40pm" },
     ],
     notes: ["\ud83c\udfe0 Airbnb"],
-    linkedin: "https://sites.google.com/view/servicephysicsnra2026/marias-linkedin",
+    // LinkedIn TBD
   },
   {
     name: "Steve",
@@ -98,7 +105,7 @@ export const team: TeamMember[] = [
       { label: "\u2708\ufe0f DFW \u2192 ORD", detail: "May 15 \u00b7 9:30am" },
       { label: "\u2708\ufe0f ORD \u2192 DFW", detail: "May 19 \u00b7 8:35pm" },
     ],
-    linkedin: "https://sites.google.com/view/servicephysicsnra2026/kellys-linkedin",
+    // LinkedIn TBD
   },
 ]
 
@@ -208,60 +215,6 @@ export const boothIncluded = [
   "Customer invite allotment",
   "5 badges (first 100 sq ft) + 3 per additional 100 sq ft",
   "Listing in 2026 Show To Go (online directory)",
-]
-
-// ── PACKING LIST ──
-export interface PackSection {
-  icon: string
-  title: string
-  items: string[]
-}
-
-export const packingList: PackSection[] = [
-  {
-    icon: "\ud83d\udccb",
-    title: "Paperwork",
-    items: ["Exhibitor badges (5 included)", "Freeman order confirmation", "Insurance certificate", "Press kit (physical + zip drive)", "Business cards"],
-  },
-  {
-    icon: "\ud83d\udda5\ufe0f",
-    title: "Tech & Booth",
-    items: ["32\" TV + cables + remote", "Nomono podcast recorder", "Ring light + stand", "Laptop + power strip", "Extension cords"],
-  },
-  {
-    icon: "\ud83d\udce6",
-    title: "Collateral",
-    items: ["White papers", "Case studies", "Hardbound journals", "Joy of Ops mugs (\u00d710)"],
-  },
-  {
-    icon: "\ud83e\udd54",
-    title: "Props",
-    items: ["Mr. Potato Head", "Joy of Ops Neon Sign", "Artificial plants", "\u201cOn Air\u201d tabletop sign", "Magnetic whiteboard + markers"],
-  },
-  {
-    icon: "\ud83d\udc55",
-    title: "Gear",
-    items: ["SP branded shirts for all days", "Comfortable shoes (long days!)"],
-  },
-]
-
-// ── LINKS ──
-export interface LinkItem {
-  icon: string
-  label: string
-  sub: string
-  href: string
-}
-
-export const moreLinks: LinkItem[] = [
-  { icon: "\ud83c\udf10", label: "Old Team Site", sub: "Google Sites 2025 reference", href: "https://sites.google.com/view/servicephysicsnra2026/home" },
-  { icon: "\ud83c\udfa5", label: "Busy Kitchen Video", sub: "Demo content", href: "https://sites.google.com/view/servicephysicsnra2026/busy-kitchen-video" },
-  { icon: "\ud83c\udfa5", label: "Grill/Lin POV Video", sub: "Demo content", href: "https://sites.google.com/view/servicephysicsnra2026/grilllin-pov" },
-  { icon: "\ud83d\udcf0", label: "Press Kit", sub: "For pressroom Room S101b", href: "https://sites.google.com/view/servicephysicsnra2026/press-kit" },
-  { icon: "\ud83c\udf89", label: "QSR Networking Party", sub: "Event details", href: "https://sites.google.com/view/servicephysicsnra2026/qsr-networking-party" },
-  { icon: "\ud83d\udcdd", label: "Lead Form", sub: "Internal use", href: "https://sites.google.com/view/servicephysicsnra2026/form" },
-  { icon: "\ud83d\udcf1", label: "QR Code (SP public)", sub: "Share with visitors", href: "https://sites.google.com/view/servicephysicsnra2026/qr-code-for-sp" },
-  { icon: "\u2601\ufe0f", label: "Sharepoint", sub: "Internal files", href: "https://sites.google.com/view/servicephysicsnra2026/sharepoint" },
 ]
 
 export const emailTemplate = `Subject: Great meeting you at NRA 2026 \u2014 [their name]

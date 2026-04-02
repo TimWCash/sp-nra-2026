@@ -7,36 +7,43 @@
    ══════════════════════════════════════════ */
 
 :root {
-  /* ── Brand Palette ── */
-  --brand-teal:   #2d8f8d;
-  --brand-navy:   #1c3440;
-  --brand-amber:  #ec9f35;
+  /* ── Brand Palette (Service Physics Style Guide) ── */
+  --brand-navy:   #0f2b38;
+  --brand-dark:   #214557;
+  --brand-gray:   #6e8c91;
+  --brand-orange: #ffb43c;
+  --brand-teal:   #39d4ae;
   --brand-white:  #ffffff;
 
   /* ── Semantic Colors (Light Mode Default) ── */
-  --bg:           #f7f9fb;
+  --bg:           #f4f7f8;
   --surface:      #ffffff;
-  --surface-alt:  #f0f4f7;
-  --border:       #d9e2e8;
-  --border-strong: #b8c9d1;
+  --surface-alt:  #edf2f4;
+  --border:       #d4dfe4;
+  --border-strong: #b0c4cc;
 
-  --text:         #1c3440;
-  --text-secondary: #4a6775;
-  --text-muted:   #7a9aaa;
+  --text:         #0f2b38;
+  --text-secondary: #3a5f6f;
+  --text-muted:   #6e8c91;
 
-  --accent:       #2d8f8d;
-  --accent-hover: #257775;
-  --accent-light: #e8f4f3;
+  --accent:       #008493;
+  --accent-hover: #006d79;
+  --accent-light: #e4f5f6;
   --accent-fg:    #ffffff;
 
-  --amber:        #ec9f35;
-  --amber-light:  #fdf3e3;
+  --amber:        #ffb43c;
+  --amber-light:  #fff6e5;
   --amber-fg:     #6b4106;
 
   --success:      #1a8a4a;
   --success-light: #e6f7ee;
   --danger:       #c5392f;
   --danger-light: #fde8e8;
+
+  --purple:       #7c3aed;
+  --purple-light: #ede9fe;
+
+  --overlay:      rgba(28, 52, 64, 0.55);
 
   --shadow-sm:    0 1px 2px rgba(28, 52, 64, 0.06);
   --shadow-md:    0 2px 8px rgba(28, 52, 64, 0.08);
@@ -62,29 +69,34 @@
 
 /* ── Dark Mode ── */
 [data-theme="dark"] {
-  --bg:           #0f1c24;
-  --surface:      #162530;
-  --surface-alt:  #1c3040;
-  --border:       #253e4d;
-  --border-strong: #34576a;
+  --bg:           #0a1e28;
+  --surface:      #0f2b38;
+  --surface-alt:  #163545;
+  --border:       #214557;
+  --border-strong: #2d5a6e;
 
-  --text:         #e8f0f4;
-  --text-secondary: #9ab5c3;
-  --text-muted:   #6b8fa0;
+  --text:         #e8f2f5;
+  --text-secondary: #9ab8c6;
+  --text-muted:   #6e8c91;
 
-  --accent:       #3db5b2;
-  --accent-hover: #50c8c5;
-  --accent-light: #1a3a3d;
-  --accent-fg:    #0f1c24;
+  --accent:       #39d4ae;
+  --accent-hover: #4ee0bc;
+  --accent-light: #0d2e2e;
+  --accent-fg:    #0a1e28;
 
-  --amber:        #ec9f35;
+  --amber:        #ffb43c;
   --amber-light:  #2e2514;
   --amber-fg:     #fde8c0;
 
-  --success:      #3ecf7a;
-  --success-light: #112e1e;
-  --danger:       #e05252;
+  --success:      #39d4ae;
+  --success-light: #0d2e2e;
+  --danger:       #da1f30;
   --danger-light: #2e1414;
+
+  --purple:       #a78bfa;
+  --purple-light: #1e1535;
+
+  --overlay:      rgba(0, 0, 0, 0.65);
 
   --shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-md:    0 2px 8px rgba(0, 0, 0, 0.25);

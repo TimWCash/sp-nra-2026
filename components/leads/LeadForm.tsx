@@ -1,14 +1,22 @@
 "use client"
 
-import { useState, useRef } from "react"
-import { X, Flame, Sun, Snowflake, Camera, Image as ImageIcon, Trash2 } from "lucide-react"
+import { useState, useRef, useEffect } from "react"
+import { X, Flame, Sun, Snowflake, Camera, Trash2, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { HeatLevel } from "./useLeads"
+
+const TEAM_MEMBERS = ["Brian", "Rebecca", "Maria", "Steve", "Kelly"] as const
+const CAPTURED_BY_KEY = "sp_nra_captured_by"
+
+function getSavedCapturedBy(): string {
+  if (typeof window === "undefined") return ""
+  return localStorage.getItem(CAPTURED_BY_KEY) || ""
+}
 
 interface LeadFormProps {
   open: boolean
   onClose: () => void
-  onSave: (data: { name: string; company: string; role: string; contact: string; notes: string; heat: HeatLevel; badgePhoto?: string }) => void
+  onSave: (data: { name: string; company: string; role: string; contact: string; notes: string; heat: HeatLevel; badgePhoto?: string; capturedBy: string }) => void
 }
 
 function resizeImage(file: File, maxWidth: number): Promise<string> {
@@ -40,16 +48,30 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
   const [heat, setHeat] = useState<HeatLevel>("warm")
   const [nameError, setNameError] = useState(false)
   const [badgePhoto, setBadgePhoto] = useState<string | undefined>()
+  const [capturedBy, setCapturedBy] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => {
+    if (open) setCapturedBy(getSavedCapturedBy())
+  }, [open])
+
   if (!open) return null
+
+  function handleCapturedByChange(value: string) {
+    setCapturedBy(value)
+    localStorage.setItem(CAPTURED_BY_KEY, value)
+  }
 
   function handleSave() {
     if (!name.trim()) {
       setNameError(true)
       return
     }
-    onSave({ name: name.trim(), company: company.trim(), role: role.trim(), contact: contact.trim(), notes: notes.trim(), heat, badgePhoto })
+    if (!capturedBy) {
+      // Prompt them to pick who they are
+      return
+    }
+    onSave({ name: name.trim(), company: company.trim(), role: role.trim(), contact: contact.trim(), notes: notes.trim(), heat, badgePhoto, capturedBy })
     setName(""); setCompany(""); setRole(""); setContact(""); setNotes(""); setHeat("warm"); setNameError(false); setBadgePhoto(undefined)
     onClose()
   }
@@ -66,7 +88,7 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
 
   return (
     <div className="fixed inset-0 z-[200] p-5 overflow-y-auto flex flex-col justify-center"
-      style={{ background: "rgba(28,52,64,0.6)", backdropFilter: "blur(8px)" }}>
+      style={{ background: "var(--overlay)", backdropFilter: "blur(8px)" }}>
       <div className="rounded-2xl p-5 w-full max-w-[480px] mx-auto"
         style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-lg)" }}>
         <div className="flex justify-between items-center mb-4">
@@ -77,6 +99,24 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
           </button>
         </div>
         <p className="text-[13px] mb-4" style={{ color: "var(--text-muted)" }}>Fill in what you know - even just a name is fine.</p>
+
+        {/* Captured By */}
+        <div className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: "var(--text-muted)" }}>
+          <User size={12} className="inline mr-1 -mt-0.5" />Who&apos;s logging this?
+        </div>
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {TEAM_MEMBERS.map((member) => (
+            <button key={member} onClick={() => handleCapturedByChange(member)}
+              className="px-3 py-1.5 rounded-full text-[13px] font-semibold cursor-pointer transition-all duration-200"
+              style={{
+                background: capturedBy === member ? "var(--accent)" : "var(--surface-alt)",
+                border: `1.5px solid ${capturedBy === member ? "var(--accent)" : "var(--border)"}`,
+                color: capturedBy === member ? "var(--accent-fg)" : "var(--text-muted)",
+              }}>
+              {member}
+            </button>
+          ))}
+        </div>
 
         {/* Badge Photo */}
         <div className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: "var(--text-muted)" }}>Badge Photo</div>

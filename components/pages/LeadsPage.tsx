@@ -1,13 +1,72 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Download, Copy, Trash2, Users } from "lucide-react"
+import { Plus, Download, Copy, Trash2, Users, RefreshCw, Check, AlertCircle, CloudOff, Cloud } from "lucide-react"
 import { useLeads } from "@/components/leads/useLeads"
 import { LeadForm } from "@/components/leads/LeadForm"
 import { LeadCard } from "@/components/leads/LeadCard"
 
+function SyncIndicator({
+  status,
+  pendingCount,
+  isSyncing,
+  onSync,
+}: {
+  status: string
+  pendingCount: number
+  isSyncing: boolean
+  onSync: () => void
+}) {
+  const config: Record<string, { icon: typeof Check; color: string; bg: string; label: string }> = {
+    synced: { icon: Check, color: "var(--success, #22c55e)", bg: "var(--success-light, #dcfce7)", label: "Synced" },
+    syncing: { icon: RefreshCw, color: "var(--accent)", bg: "var(--accent-light)", label: "Syncing..." },
+    pending: { icon: AlertCircle, color: "var(--amber)", bg: "var(--amber-light)", label: `${pendingCount} pending` },
+    error: { icon: AlertCircle, color: "var(--danger)", bg: "var(--danger-light)", label: "Sync error" },
+    "no-url": { icon: CloudOff, color: "var(--text-muted)", bg: "var(--surface-alt)", label: "Sheets not configured" },
+    idle: { icon: Cloud, color: "var(--text-muted)", bg: "var(--surface-alt)", label: "Not synced" },
+  }
+
+  const c = config[status] ?? config.idle
+  const Icon = c.icon
+
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      <span
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+        style={{ background: c.bg, color: c.color }}
+      >
+        <Icon size={12} className={status === "syncing" ? "animate-spin" : ""} />
+        {c.label}
+      </span>
+      {(status === "pending" || status === "error" || status === "idle") && (
+        <button
+          onClick={onSync}
+          disabled={isSyncing}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold cursor-pointer transition-all duration-200 active:scale-[0.95] disabled:opacity-50"
+          style={{ background: "var(--accent-light)", color: "var(--accent)", border: "1px solid var(--accent)" }}
+        >
+          <RefreshCw size={11} className={isSyncing ? "animate-spin" : ""} />
+          Sync to Sheets
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function LeadsPage() {
-  const { leads, stats, addLead, deleteLead, clearAll, exportCSV, copyAll } = useLeads()
+  const {
+    leads,
+    stats,
+    addLead,
+    deleteLead,
+    clearAll,
+    exportCSV,
+    copyAll,
+    syncStatus,
+    pendingCount,
+    isSyncing,
+    syncNow,
+  } = useLeads()
   const [formOpen, setFormOpen] = useState(false)
   const [copyLabel, setCopyLabel] = useState("Copy All")
 
@@ -32,6 +91,8 @@ export function LeadsPage() {
 
       {stats.total > 0 && (
         <>
+          <SyncIndicator status={syncStatus} pendingCount={pendingCount} isSyncing={isSyncing} onSync={syncNow} />
+
           <div className="text-[13px] mb-4 font-medium" style={{ color: "var(--text-muted)" }}>
             <span className="font-bold" style={{ color: "var(--accent)" }}>{stats.total}</span> total &middot; {stats.hot} hot &middot; {stats.warm} warm &middot; {stats.cool} cool
           </div>

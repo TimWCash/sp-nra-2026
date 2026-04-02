@@ -1,41 +1,22 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { Check, Mail, Truck, MapPin, ChevronRight, ExternalLink, Copy } from "lucide-react"
-import { packingList, moreLinks, emailTemplate } from "@/lib/data"
+import { useState } from "react"
+import { Copy, Mail, Users, MessageCircle, Mic, Activity, Truck, ChevronRight } from "lucide-react"
+import { keyDates, emailTemplate } from "@/lib/data"
+import type { PageId } from "@/components/layout/BottomNav"
 
-function CheckItem({ id, label }: { id: string; label: string }) {
-  const [checked, setChecked] = useState(false)
-
-  useEffect(() => {
-    setChecked(localStorage.getItem("sp_check_" + id) === "1")
-  }, [id])
-
-  const toggle = useCallback(() => {
-    setChecked((prev) => {
-      const next = !prev
-      localStorage.setItem("sp_check_" + id, next ? "1" : "0")
-      return next
-    })
-  }, [id])
-
-  return (
-    <button onClick={toggle} className="flex items-start gap-3 py-3 w-full text-left cursor-pointer bg-transparent border-none border-b"
-      style={{ borderColor: "var(--border)" }}>
-      <div className="w-5 h-5 rounded-md flex-shrink-0 flex items-center justify-center transition-all duration-150 mt-0.5"
-        style={{
-          background: checked ? "var(--success)" : "var(--surface)",
-          border: checked ? "none" : "1.5px solid var(--border-strong)",
-        }}>
-        {checked && <Check size={12} strokeWidth={3} color="white" />}
-      </div>
-      <span className={`text-sm font-medium ${checked ? "line-through opacity-40" : ""}`}
-        style={{ color: checked ? "var(--text-muted)" : "var(--text-secondary)" }}>{label}</span>
-    </button>
-  )
+const badgeVariant: Record<string, string> = {
+  teal: "bg-sp-accent-light text-sp-accent",
+  green: "bg-sp-success-light text-sp-success",
+  red: "bg-sp-danger-light text-sp-danger",
+  muted: "bg-sp-surface-alt text-sp-muted",
 }
 
-export function MorePage() {
+interface MorePageProps {
+  onNavigate?: (page: PageId) => void
+}
+
+export function MorePage({ onNavigate }: MorePageProps) {
   const [copyLabel, setCopyLabel] = useState("Copy to clipboard")
 
   function copyEmail() {
@@ -47,18 +28,42 @@ export function MorePage() {
 
   return (
     <div className="animate-fade-in">
-      <h1 className="text-xl font-bold mb-5" style={{ color: "var(--text)" }}>More</h1>
+      <h1 className="text-xl font-bold mb-4" style={{ color: "var(--text)" }}>More</h1>
 
-      {/* Packing List */}
-      <SectionLabel>What to Bring</SectionLabel>
-      <div className="rounded-xl p-4 mb-6" style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
-        {packingList.map((section, si) => (
-          <div key={si} className={si < packingList.length - 1 ? "mb-5" : ""}>
-            <div className="text-[11px] font-bold tracking-widest uppercase mb-1"
-              style={{ color: "var(--accent)" }}>{section.title}</div>
-            {section.items.map((item, ii) => (
-              <CheckItem key={`${si}-${ii}`} id={`wi_${si}_${ii}`} label={item} />
-            ))}
+      {/* Quick Nav */}
+      <div className="space-y-1.5 mb-6">
+        {[
+          { page: "team" as PageId, Icon: Users, label: "Team", sub: "Travel & contacts" },
+          { page: "talk" as PageId, Icon: MessageCircle, label: "Talking Points", sub: "At the booth" },
+          { page: "podcast" as PageId, Icon: Mic, label: "Podcast", sub: "Joy of Ops schedule" },
+          { page: "status" as PageId, Icon: Activity, label: "Team Status", sub: "Who's where" },
+          { page: "loadin" as PageId, Icon: Truck, label: "Load In / Out", sub: "Marshalling & teardown" },
+        ].map((item) => (
+          <button key={item.page} onClick={() => onNavigate?.(item.page)}
+            className="w-full flex items-center gap-3 rounded-xl p-3.5 text-left cursor-pointer transition-all duration-200 active:scale-[0.98]"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: "var(--accent-light)" }}>
+              <item.Icon size={16} style={{ color: "var(--accent)" }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>{item.label}</div>
+              <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>{item.sub}</div>
+            </div>
+            <ChevronRight size={16} style={{ color: "var(--text-muted)", opacity: 0.5 }} />
+          </button>
+        ))}
+      </div>
+
+      {/* Key Dates */}
+      <SectionLabel>Key Dates</SectionLabel>
+      <div className="rounded-xl overflow-hidden mb-6"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
+        {keyDates.map((d, i) => (
+          <div key={i} className={`flex justify-between items-center px-4 py-3 text-sm ${i < keyDates.length - 1 ? "border-b" : ""}`}
+            style={{ borderColor: "var(--border)" }}>
+            <span style={{ color: "var(--text-secondary)" }}>{d.label}</span>
+            <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${badgeVariant[d.variant]}`}>{d.date}</span>
           </div>
         ))}
       </div>
@@ -79,80 +84,10 @@ export function MorePage() {
         style={{ background: "var(--surface-alt)", border: "1px solid var(--border)", color: "var(--text)" }}>
         <Copy size={14} /> {copyLabel}
       </button>
-
-      {/* Load In */}
-      <SectionLabel className="mt-6">Load In</SectionLabel>
-      <div className="rounded-xl overflow-hidden mb-3"
-        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-        {[
-          { title: "1. Head to Marshalling Yard first", sub: "Do not drive directly to loading dock" },
-          { title: "2. Check in at Freeman desk", sub: "Bring confirmation + booth number" },
-          { title: "3. Follow floor markings to #7365", sub: "North Building" },
-          { title: "4. Set up by May 15, 4:00pm" },
-        ].map((item, i) => (
-          <div key={i} className={`px-4 py-3 ${i < 3 ? "border-b" : ""}`} style={{ borderColor: "var(--border)" }}>
-            <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>{item.title}</div>
-            {item.sub && <div className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{item.sub}</div>}
-          </div>
-        ))}
-      </div>
-      <a href="https://maps.app.goo.gl/Ppvt3b72V9VGT1jc9" target="_blank" rel="noopener noreferrer"
-        className="flex items-center justify-between p-3.5 rounded-xl no-underline transition-all duration-200 mb-3 active:scale-[0.98]"
-        style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}>
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "var(--accent-light)" }}>
-            <Truck size={16} style={{ color: "var(--accent)" }} />
-          </div>
-          <div><div className="text-sm font-medium">Marshalling Yard</div><div className="text-xs" style={{ color: "var(--text-muted)" }}>Open in Maps</div></div>
-        </div>
-        <ChevronRight size={16} style={{ color: "var(--text-muted)" }} />
-      </a>
-
-      <SectionLabel>Load Out</SectionLabel>
-      <div className="rounded-xl overflow-hidden mb-6"
-        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-        {[
-          { title: "Do NOT pack up before 3pm Tuesday", sub: "Risk losing future show rights" },
-          { title: "Move-out: May 19, 3:01pm - 7:30pm" },
-          { title: "Continue May 20-21: 7:30am - 4:30pm" },
-          { title: "All items cleared by May 22 noon" },
-        ].map((item, i) => (
-          <div key={i} className={`px-4 py-3 ${i < 3 ? "border-b" : ""}`} style={{ borderColor: "var(--border)" }}>
-            <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>{item.title}</div>
-            {item.sub && <div className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{item.sub}</div>}
-          </div>
-        ))}
-      </div>
-
-      {/* Links */}
-      <SectionLabel>Key Links</SectionLabel>
-      <div className="space-y-2 mb-6">
-        {moreLinks.map((link, i) => (
-          <a key={i} href={link.href} target="_blank" rel="noopener noreferrer"
-            className="flex items-center justify-between p-3.5 rounded-xl no-underline transition-all duration-200 active:scale-[0.98]"
-            style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}>
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "var(--accent-light)" }}>
-                <ExternalLink size={16} style={{ color: "var(--accent)" }} />
-              </div>
-              <div><div className="text-sm font-medium">{link.label}</div><div className="text-xs" style={{ color: "var(--text-muted)" }}>{link.sub}</div></div>
-            </div>
-            <ChevronRight size={16} style={{ color: "var(--text-muted)" }} />
-          </a>
-        ))}
-      </div>
-
-      {/* Badge Pickup */}
-      <SectionLabel>Badge Pickup</SectionLabel>
-      <div className="rounded-xl p-4 text-sm leading-relaxed"
-        style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
-        <p>Badges picked up on-site at McCormick Place registration.</p>
-        <p className="mt-2" style={{ color: "var(--text-muted)" }}>Bring exhibitor confirmation email. 5 complimentary badges included for first 100 sq ft + 3 per additional 100 sq ft.</p>
-      </div>
     </div>
   )
 }
 
-function SectionLabel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`text-[11px] font-bold tracking-widest uppercase mb-2.5 ${className}`} style={{ color: "var(--text-muted)" }}>{children}</div>
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <div className="text-[11px] font-bold tracking-widest uppercase mb-2.5" style={{ color: "var(--text-muted)" }}>{children}</div>
 }

@@ -14,15 +14,24 @@ function TalkCard({ point }: { point: TalkingPoint }) {
   )
 }
 
+function Section({ icon, title, className = "" }: { icon: React.ReactNode; title: string; className?: string }) {
+  return (
+    <div className={`flex items-center gap-2 mb-2.5 ${className}`}>
+      <span style={{ color: "var(--accent)" }}>{icon}</span>
+      <h2 className="text-base font-bold" style={{ color: "var(--text)" }}>{title}</h2>
+    </div>
+  )
+}
+
 export function TalkingPage() {
   return (
     <div className="animate-fade-in">
-      <h1 className="text-xl font-bold mb-4" style={{ color: "var(--text)" }}>Talking Points</h1>
+      <h1 className="text-xl font-bold mb-4" style={{ color: "var(--text)" }}>At the Booth</h1>
 
       <div className="rounded-xl p-3 mb-5 text-[13px]"
         style={{ background: "var(--accent-light)", color: "var(--accent)" }}>
         <Target size={14} className="inline mr-1.5" />
-        Use these to open conversations. Keep it natural.
+        Use these to open conversations. Keep it natural &mdash; you know this stuff. &#127919;
       </div>
 
       <Section icon={<MessageCircle size={16} />} title="Opening Lines" />
@@ -34,23 +43,14 @@ export function TalkingPage() {
       <Section icon={<Shield size={16} />} title="Objection Handling" className="mt-6" />
       {objections.map((p, i) => <TalkCard key={i} point={p} />)}
 
-      <Section icon={<ArrowRight size={16} />} title="Closing" className="mt-6" />
+      <Section icon={<ArrowRight size={16} />} title="Closing the Conversation" className="mt-6" />
       <TalkCard point={{ tag: "NEXT STEP", text: "Always end with a clear action: send a case study, book a follow-up call, or invite them to be a podcast guest. Scan their badge with lead retrieval and add a note immediately." }} />
 
-      <Section icon={<Target size={16} />} title="Mr. Potato Head" className="mt-6" />
+      <Section icon={<span className="text-base">&#129364;</span>} title="Mr. Potato Head" className="mt-6" />
       <div className="rounded-xl p-4 text-sm leading-relaxed"
         style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
-        Hide him somewhere different each day - creates a fun reason to come back. Or hide individual parts around the booth as a scavenger hunt. First to find all pieces wins a Joy of Ops mug.
+        Hide him somewhere different each day &mdash; creates a fun reason to come back. Or hide individual parts around the booth as a scavenger hunt. First to find all pieces wins a Joy of Ops mug.
       </div>
-    </div>
-  )
-}
-
-function Section({ icon, title, className = "" }: { icon: React.ReactNode; title: string; className?: string }) {
-  return (
-    <div className={`flex items-center gap-2 mb-2.5 ${className}`}>
-      <span style={{ color: "var(--accent)" }}>{icon}</span>
-      <h2 className="text-base font-bold" style={{ color: "var(--text)" }}>{title}</h2>
     </div>
   )
 }

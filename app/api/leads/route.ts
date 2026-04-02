@@ -1,0 +1,75 @@
+import { NextRequest, NextResponse } from "next/server"
+
+const SHEET_ID = "1cVKkjbGmIiZO5jbVvPXmnLKvwR0LaTXDiDuisLjOBhU"
+
+export async function POST(req: NextRequest) {
+  try {
+    const data = await req.json()
+
+    // Use Google Sheets API v4 with API key for public sheets,
+    // or service account if configured
+    const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+
+    if (serviceAccountJson) {
+      // Service account approach (full API access)
+      const { google } = await import("googleapis")
+      const credentials = JSON.parse(serviceAccountJson)
+      const auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+      })
+      const sheets = google.sheets({ version: "v4", auth })
+
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SHEET_ID,
+        range: "Sheet1!A:I",
+        valueInputOption: "USER_ENTERED",
+        requestBody: {
+          values: [[
+            new Date().toISOString(),
+            data.name || "",
+            data.company || "",
+            data.role || "",
+            data.contact || "",
+            data.heat || "",
+            data.notes || "",
+            data.capturedBy || "",
+            data.badgePhoto || "",
+          ]],
+        },
+      })
+
+      return NextResponse.json({ status: "ok" })
+    }
+
+    // Fallback: Use Google Apps Script webhook if configured
+    const webhookUrl = process.env.GOOGLE_SHEETS_WEBHOOK_URL
+    if (webhookUrl) {
+      const res = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify(data),
+        redirect: "follow",
+      })
+      // Apps Script redirects — just check we got something back
+      const text = await res.text()
+      try {
+        const json = JSON.parse(text)
+        if (json.status === "ok") return NextResponse.json({ status: "ok" })
+      } catch {
+        // Sometimes the redirect response isn't JSON
+      }
+      // If we got here without error, it probably worked
+      if (res.ok || res.status === 302) {
+        return NextResponse.json({ status: "ok" })
+      }
+      return NextResponse.json({ status: "error", message: "Webhook failed" }, { status: 500 })
+    }
+
+    return NextResponse.json({ status: "error", message: "No Google Sheets credentials configured" }, { status: 500 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("Sheets sync error:", message)
+    return NextResponse.json({ status: "error", message }, { status: 500 })
+  }
+}

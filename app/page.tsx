@@ -10,6 +10,9 @@ import { BoothPage } from "@/components/pages/BoothPage"
 import { TeamPage } from "@/components/pages/TeamPage"
 import { TalkingPage } from "@/components/pages/TalkingPage"
 import { LeadsPage } from "@/components/pages/LeadsPage"
+import { PodcastPage } from "@/components/pages/PodcastPage"
+import { TeamStatusPage } from "@/components/pages/TeamStatusPage"
+import { LoadInOutPage } from "@/components/pages/LoadInOutPage"
 import { MorePage } from "@/components/pages/MorePage"
 
 const pages: Record<PageId, React.ComponentType<{ onNavigate?: (page: PageId) => void }>> = {
@@ -19,6 +22,9 @@ const pages: Record<PageId, React.ComponentType<{ onNavigate?: (page: PageId) =>
   team: TeamPage,
   talk: TalkingPage,
   leads: LeadsPage,
+  podcast: PodcastPage,
+  status: TeamStatusPage,
+  loadin: LoadInOutPage,
   more: MorePage,
 }
 

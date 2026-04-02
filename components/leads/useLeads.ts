@@ -1,6 +1,13 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import {
+  syncLead,
+  syncPending,
+  computeSyncStatus,
+  getPendingCount,
+  type SyncStatus,
+} from "@/lib/sheets-sync"
 
 export type HeatLevel = "hot" | "warm" | "cool"
 
@@ -14,6 +21,7 @@ export interface Lead {
   heat: HeatLevel
   time: string
   badgePhoto?: string
+  capturedBy?: string
 }
 
 const STORAGE_KEY = "sp_nra_leads"
@@ -29,9 +37,20 @@ function loadLeads(): Lead[] {
 
 export function useLeads() {
   const [leads, setLeads] = useState<Lead[]>([])
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle")
+  const [pendingCount, setPendingCount] = useState(0)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   useEffect(() => {
-    setLeads(loadLeads())
+    const loaded = loadLeads()
+    setLeads(loaded)
+    setSyncStatus(computeSyncStatus(loaded))
+    setPendingCount(getPendingCount())
+  }, [])
+
+  const refreshSyncState = useCallback((currentLeads: Lead[]) => {
+    setSyncStatus(computeSyncStatus(currentLeads))
+    setPendingCount(getPendingCount())
   }, [])
 
   const save = useCallback((updated: Lead[]) => {
@@ -39,7 +58,7 @@ export function useLeads() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
   }, [])
 
-  const addLead = useCallback((data: Omit<Lead, "id" | "time">) => {
+  const addLead = useCallback(async (data: Omit<Lead, "id" | "time">) => {
     const lead: Lead = {
       ...data,
       id: Date.now(),
@@ -47,22 +66,58 @@ export function useLeads() {
         month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true,
       }),
     }
-    save([lead, ...loadLeads()])
-  }, [save])
+    const updated = [lead, ...loadLeads()]
+    save(updated)
+
+    // Fire-and-forget sync to Google Sheets
+    setSyncStatus("syncing")
+    syncLead(lead).then(() => {
+      refreshSyncState(loadLeads())
+    })
+  }, [save, refreshSyncState])
 
   const deleteLead = useCallback((id: number) => {
-    save(loadLeads().filter((l) => l.id !== id))
-  }, [save])
+    const updated = loadLeads().filter((l) => l.id !== id)
+    save(updated)
+    refreshSyncState(updated)
+  }, [save, refreshSyncState])
 
   const clearAll = useCallback(() => {
     save([])
-  }, [save])
+    refreshSyncState([])
+  }, [save, refreshSyncState])
+
+  const syncNow = useCallback(async () => {
+    if (isSyncing) return 0
+    setIsSyncing(true)
+    setSyncStatus("syncing")
+    try {
+      // First sync any pending leads
+      const count = await syncPending()
+
+      // Then try to sync any leads that aren't in the synced set yet
+      const current = loadLeads()
+      const { getSyncedIds } = await import("@/lib/sheets-sync")
+      const syncedIds = getSyncedIds()
+      const unsynced = current.filter((l) => !syncedIds.has(l.id))
+      let extraSynced = 0
+      for (const lead of unsynced) {
+        const ok = await syncLead(lead)
+        if (ok) extraSynced++
+      }
+
+      refreshSyncState(loadLeads())
+      return count + extraSynced
+    } finally {
+      setIsSyncing(false)
+    }
+  }, [isSyncing, refreshSyncState])
 
   const exportCSV = useCallback(() => {
     if (leads.length === 0) return
-    const headers = ["Name", "Company", "Role", "Contact", "Heat", "Notes", "Time"]
+    const headers = ["Name", "Company", "Role", "Contact", "Heat", "Notes", "Captured By", "Time"]
     const rows = leads.map((l) =>
-      [l.name, l.company, l.role, l.contact, l.heat, l.notes.replace(/,/g, "").replace(/\n/g, " "), l.time]
+      [l.name, l.company, l.role, l.contact, l.heat, l.notes.replace(/,/g, "").replace(/\n/g, " "), l.capturedBy || "", l.time]
         .map((v) => `"${v || ""}"`)
         .join(",")
     )
@@ -99,5 +154,17 @@ export function useLeads() {
     cool: leads.filter((l) => l.heat === "cool").length,
   }
 
-  return { leads, stats, addLead, deleteLead, clearAll, exportCSV, copyAll }
+  return {
+    leads,
+    stats,
+    addLead,
+    deleteLead,
+    clearAll,
+    exportCSV,
+    copyAll,
+    syncStatus,
+    pendingCount,
+    isSyncing,
+    syncNow,
+  }
 }

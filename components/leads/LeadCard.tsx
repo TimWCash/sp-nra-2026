@@ -38,9 +38,9 @@ export function LeadCard({ lead, onDelete }: LeadCardProps) {
           {lead.contact && <div className="text-xs mt-1 font-medium" style={{ color: "var(--accent)" }}>{lead.contact}</div>}
         </div>
         <button onClick={() => onDelete(lead.id)} aria-label="Delete lead"
-          className="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer flex-shrink-0 transition-colors duration-200"
+          className="w-9 h-9 rounded-lg flex items-center justify-center cursor-pointer flex-shrink-0 transition-colors duration-200 active:scale-[0.93]"
           style={{ background: "var(--surface-alt)", border: "1px solid var(--border)", color: "var(--text-muted)" }}>
-          <X size={14} />
+          <X size={15} />
         </button>
       </div>
       {lead.badgePhoto && (
@@ -54,8 +54,14 @@ export function LeadCard({ lead, onDelete }: LeadCardProps) {
           {lead.notes}
         </div>
       )}
-      <div className="flex items-center gap-2 mt-2.5">
+      <div className="flex items-center gap-2 mt-2.5 flex-wrap">
         <HeatBadge heat={lead.heat} />
+        {lead.capturedBy && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+            style={{ background: "var(--surface-alt)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
+            {lead.capturedBy}
+          </span>
+        )}
         <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{lead.time}</span>
       </div>
     </div>

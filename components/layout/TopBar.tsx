@@ -21,7 +21,7 @@ export function TopBar() {
             <div className="text-sm font-bold leading-tight" style={{ color: "var(--text)" }}>
               NRA 2026
             </div>
-            <div className="text-[10px] font-medium" style={{ color: "var(--text-muted)" }}>
+            <div className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
               Booth #7365
             </div>
           </div>
@@ -38,7 +38,7 @@ export function TopBar() {
           </button>
           <div className="text-right">
             <div className="text-sm font-semibold tabular-nums" style={{ color: "var(--text)" }}>{time}</div>
-            <div className="text-[10px] font-medium" style={{ color: "var(--text-muted)" }}>May 16-19 Chicago</div>
+            <div className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>May 16-19 Chicago</div>
           </div>
         </div>
       </div>

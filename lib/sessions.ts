@@ -3,7 +3,38 @@ export interface Session {
   title: string
   location: string
   category: "education" | "culinary" | "beverage" | "innovation" | "discovery" | "tour" | "event" | "other"
+  spPick?: boolean
 }
+
+// Sessions relevant to Service Physics: operations, efficiency, labor, training, AI in ops, kitchen mgmt, workforce
+const SP_PICKS = new Set([
+  "Stronger Restaurant Teams: Clarifying Roles, Driving Accountability, and Building a Culture That Retains Talent",
+  "Training in the TikTok Era: Micro-Learning and New Expectations for Workforce Success",
+  "Convert Wasted Potential Into Profits",
+  "Before Disaster Hits the Kitchen: Practical Preparedness and Recovery Strategies for Restaurant Operators",
+  "The 2026 State of the Industry: Position Yourself for Success in the Face of Uncertainty",
+  "Training Without a Training Department: Practical Strategies for Restaurants",
+  "Empowering New Hires to Thrive from Day One",
+  "Smarter Staffing: How Technology Is Solving Today's Restaurant Labor Challenges",
+  "AI in Hospitality: Keeping the Human Connection",
+  "Making Hospitality Hospitable (Again)",
+  "The AI Teammate: Making Daily Ops Feel Less Like a Guessing Game",
+  "AI That Works: Real Operators, Real Wins",
+  "Workshop: AI Essentials for Operators",
+  "10 Ways to Cut Food Costs Without Cutting Flavor",
+  "Menu Profit Playbook: 3 Field Examples to $60K+ Profit",
+  "7 Numbers Every Restaurateur Needs to Know",
+  "Sidestep the Sticker Shock: How to Keep Menus Affordable Amidst Higher Food Costs and Labor Pressure",
+  "Keeping Customers Curious: Bold Flavors and the Quest for Quality",
+  "Thriving Through Challenges: A Discussion with Foodservice Leaders Driving Real Growth",
+  "Beyond Visibility: Driving Revenue Through Real-Time Operations Execution",
+  "Operator Meetup: How To Win the Guest Without Killing Margin",
+  "Harnessing Uncertainty: Turning Market Shifts Into Momentum",
+  "A Year of GLP-1s: Consumer Behavior That's Here to Stay",
+  "Cultural Intelligence as a Growth Strategy for Modern Restaurant Brands",
+  "Keynote '26",
+  "Featured Session with Technomic - Get it While it's Hot: Driving Demand with LTOs",
+])
 
 function categorize(title: string, location: string): Session["category"] {
   if (location.startsWith("Room S")) return "education"
@@ -17,7 +48,7 @@ function categorize(title: string, location: string): Session["category"] {
 }
 
 function s(time: string, title: string, location: string): Session {
-  return { time, title, location, category: categorize(title, location) }
+  return { time, title, location, category: categorize(title, location), spPick: SP_PICKS.has(title) }
 }
 
 export const nraSessions: Record<string, Session[]> = {
@@ -164,6 +195,7 @@ export const nraSessions: Record<string, Session[]> = {
 
 export const sessionCategories = [
   { key: "all", label: "All" },
+  { key: "spPick", label: "⭐ SP Picks" },
   { key: "education", label: "Education" },
   { key: "culinary", label: "Culinary" },
   { key: "beverage", label: "Beverage" },
