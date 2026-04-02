@@ -129,7 +129,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
         style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
         <div className="flex justify-between items-center mb-3">
           <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: "var(--text-muted)" }}>Team Status</span>
-          <button onClick={() => onNavigate?.("team-status" as PageId)}
+          <button onClick={() => onNavigate?.("status")}
             className="text-[11px] font-semibold cursor-pointer bg-transparent border-0 p-0 flex items-center gap-1"
             style={{ color: "var(--accent)" }}>
             View All <ArrowRight size={12} />

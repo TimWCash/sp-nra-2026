@@ -47,6 +47,7 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
   const [notes, setNotes] = useState("")
   const [heat, setHeat] = useState<HeatLevel>("warm")
   const [nameError, setNameError] = useState(false)
+  const [capturedByError, setCapturedByError] = useState(false)
   const [badgePhoto, setBadgePhoto] = useState<string | undefined>()
   const [capturedBy, setCapturedBy] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -68,11 +69,11 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
       return
     }
     if (!capturedBy) {
-      // Prompt them to pick who they are
+      setCapturedByError(true)
       return
     }
     onSave({ name: name.trim(), company: company.trim(), role: role.trim(), contact: contact.trim(), notes: notes.trim(), heat, badgePhoto, capturedBy })
-    setName(""); setCompany(""); setRole(""); setContact(""); setNotes(""); setHeat("warm"); setNameError(false); setBadgePhoto(undefined)
+    setName(""); setCompany(""); setRole(""); setContact(""); setNotes(""); setHeat("warm"); setNameError(false); setCapturedByError(false); setBadgePhoto(undefined)
     onClose()
   }
 
@@ -101,12 +102,15 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
         <p className="text-[13px] mb-4" style={{ color: "var(--text-muted)" }}>Fill in what you know - even just a name is fine.</p>
 
         {/* Captured By */}
-        <div className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: "var(--text-muted)" }}>
-          <User size={12} className="inline mr-1 -mt-0.5" />Who&apos;s logging this?
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[11px] font-bold tracking-widest uppercase" style={{ color: capturedByError ? "var(--danger)" : "var(--text-muted)" }}>
+            <User size={12} className="inline mr-1 -mt-0.5" />Who&apos;s logging this?
+          </div>
+          {capturedByError && <span className="text-[11px] font-semibold" style={{ color: "var(--danger)" }}>Required</span>}
         </div>
         <div className="flex flex-wrap gap-1.5 mb-4">
           {TEAM_MEMBERS.map((member) => (
-            <button key={member} onClick={() => handleCapturedByChange(member)}
+            <button key={member} onClick={() => { handleCapturedByChange(member); setCapturedByError(false) }}
               className="px-3 py-1.5 rounded-full text-[13px] font-semibold cursor-pointer transition-all duration-200"
               style={{
                 background: capturedBy === member ? "var(--accent)" : "var(--surface-alt)",
