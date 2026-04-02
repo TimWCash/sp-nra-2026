@@ -1,10 +1,13 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { MapPin, Calendar, Clock, Building2, Store, Users, MessageCircle, ExternalLink, Wifi, Mic, UserPlus, Zap, Target, Trophy, ArrowRight } from "lucide-react"
 import { useCountdown } from "@/hooks/useCountdown"
 import { team as teamMembers } from "@/lib/data"
 
 import type { PageId } from "@/components/layout/BottomNav"
+
+const BAT_SIGNAL_KEY = "sp_bat_signal"
 
 interface HomePageProps {
   onNavigate?: (page: PageId) => void
@@ -12,9 +15,49 @@ interface HomePageProps {
 
 export function HomePage({ onNavigate }: HomePageProps) {
   const { days, hours, mins, secs, isLive } = useCountdown()
+  const [batActive, setBatActive] = useState(false)
+  const [pulse, setPulse] = useState(false)
+
+  useEffect(() => {
+    const check = () => {
+      try {
+        const s = JSON.parse(localStorage.getItem(BAT_SIGNAL_KEY) || '{"active":false}')
+        setBatActive(!!s.active)
+      } catch { setBatActive(false) }
+    }
+    check()
+    const interval = setInterval(check, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    if (!batActive) return
+    const interval = setInterval(() => setPulse((p) => !p), 800)
+    return () => clearInterval(interval)
+  }, [batActive])
 
   return (
     <div className="animate-fade-in">
+
+      {/* Bat Signal Banner */}
+      {batActive && (
+        <button
+          onClick={() => onNavigate?.("status")}
+          className="w-full rounded-2xl p-4 mb-4 flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-all duration-300 border-0"
+          style={{
+            background: pulse ? "var(--danger)" : "#c0392b",
+            boxShadow: pulse ? "0 0 28px rgba(220,53,69,0.5)" : "0 0 12px rgba(220,53,69,0.25)",
+          }}
+        >
+          <span className="text-3xl">🦇</span>
+          <div className="flex-1 text-left">
+            <div className="font-extrabold text-white text-[15px]">BAT SIGNAL ACTIVE</div>
+            <div className="text-white/70 text-[12px]">Booth needs backup — tap to respond</div>
+          </div>
+          <ArrowRight size={18} color="white" />
+        </button>
+      )}
+
       {/* Hero */}
       <div className="mb-5">
         <div className="flex items-center gap-2 mb-1">

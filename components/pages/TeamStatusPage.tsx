@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Users, Target } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
+import { Users, Target, CheckCircle } from "lucide-react"
 import { team as teamData } from "@/lib/data"
 
 type MemberStatus = "at-booth" | "on-break" | "walking" | "in-meeting" | "off"
@@ -15,7 +15,11 @@ interface TeamMemberStatus {
 
 const STORAGE_KEY = "sp_team_status"
 const LEADS_KEY = "sp_nra_leads"
+const BAT_SIGNAL_KEY = "sp_bat_signal"
 const DAILY_GOAL = 20
+
+// Bat signal SMS — opens Messages with pre-filled text to paste into group chat
+const BAT_SIGNAL_SMS = "sms:?body=🦇 BAT SIGNAL — Booth %237365 is SLAMMED. Need all hands NOW! Come back ASAP."
 
 const statusConfig: Record<MemberStatus, { label: string; color: string; bg: string }> = {
   "at-booth": { label: "At Booth", color: "var(--success)", bg: "var(--success-light)" },
@@ -55,14 +59,44 @@ function getLeadCount(): number {
   } catch { return 0 }
 }
 
+function getBatSignal(): { active: boolean; since: number } {
+  if (typeof window === "undefined") return { active: false, since: 0 }
+  try {
+    return JSON.parse(localStorage.getItem(BAT_SIGNAL_KEY) || '{"active":false,"since":0}')
+  } catch { return { active: false, since: 0 } }
+}
+
+function setBatSignal(active: boolean) {
+  localStorage.setItem(BAT_SIGNAL_KEY, JSON.stringify({ active, since: active ? Date.now() : 0 }))
+}
+
 export function TeamStatusPage() {
   const [team, setTeam] = useState<TeamMemberStatus[]>(defaultTeam)
   const [leadCount, setLeadCount] = useState(0)
+  const [batSignal, setBatSignalState] = useState<{ active: boolean; since: number }>({ active: false, since: 0 })
+  const [pulse, setPulse] = useState(false)
 
   useEffect(() => {
     setTeam(loadTeam())
     setLeadCount(getLeadCount())
+    setBatSignalState(getBatSignal())
   }, [])
+
+  // Poll localStorage every 5s so other devices see bat signal when they open the app
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setBatSignalState(getBatSignal())
+      setLeadCount(getLeadCount())
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Pulse animation while bat signal is active
+  useEffect(() => {
+    if (!batSignal.active) return
+    const interval = setInterval(() => setPulse((p) => !p), 800)
+    return () => clearInterval(interval)
+  }, [batSignal.active])
 
   function cycleStatus(index: number) {
     const updated = [...team]
@@ -71,6 +105,22 @@ export function TeamStatusPage() {
     setTeam(updated)
     saveTeam(updated)
   }
+
+  const activateBatSignal = useCallback(() => {
+    setBatSignal(true)
+    setBatSignalState({ active: true, since: Date.now() })
+    // Open SMS with pre-filled message
+    window.location.href = BAT_SIGNAL_SMS
+  }, [])
+
+  const clearBatSignal = useCallback(() => {
+    setBatSignal(false)
+    setBatSignalState({ active: false, since: 0 })
+  }, [])
+
+  const minutesAgo = batSignal.since
+    ? Math.floor((Date.now() - batSignal.since) / 60000)
+    : 0
 
   // Summary counts
   const counts: Record<MemberStatus, number> = { "at-booth": 0, "on-break": 0, "walking": 0, "in-meeting": 0, "off": 0 }
@@ -81,21 +131,62 @@ export function TeamStatusPage() {
   if (counts["on-break"]) summaryParts.push(`${counts["on-break"]} on break`)
   if (counts["walking"]) summaryParts.push(`${counts["walking"]} walking`)
   if (counts["in-meeting"]) summaryParts.push(`${counts["in-meeting"]} in meeting`)
-  if (counts["off"]) summaryParts.push(`${counts["off"]} off`)
 
   const progressPct = Math.min(100, Math.round((leadCount / DAILY_GOAL) * 100))
 
   return (
     <div className="animate-fade-in">
-      <h1 className="text-xl font-bold mb-4" style={{ color: "var(--text)" }}>Team Status</h1>
 
-      {/* Summary bar */}
-      <div className="text-[13px] font-medium mb-4" style={{ color: "var(--text-muted)" }}>
-        {summaryParts.join(" \u00b7 ")}
-      </div>
+      {/* ── BAT SIGNAL ACTIVE BANNER ── */}
+      {batSignal.active && (
+        <div
+          className="rounded-2xl p-4 mb-5 flex items-center gap-3 transition-all duration-300"
+          style={{
+            background: pulse ? "var(--danger)" : "#c0392b",
+            boxShadow: pulse
+              ? "0 0 32px rgba(220,53,69,0.6), 0 4px 16px rgba(0,0,0,0.2)"
+              : "0 0 16px rgba(220,53,69,0.3), 0 4px 16px rgba(0,0,0,0.2)",
+          }}
+        >
+          <span className="text-3xl" style={{ filter: pulse ? "drop-shadow(0 0 8px white)" : "none" }}>🦇</span>
+          <div className="flex-1">
+            <div className="font-extrabold text-white text-[15px] leading-tight">BAT SIGNAL ACTIVE</div>
+            <div className="text-white/80 text-[12px] mt-0.5">
+              All hands to Booth #7365{minutesAgo > 0 ? ` · ${minutesAgo}m ago` : " · just now"}
+            </div>
+          </div>
+          <button
+            onClick={clearBatSignal}
+            className="flex flex-col items-center gap-0.5 cursor-pointer bg-white/20 rounded-xl px-3 py-2 active:scale-95 transition-transform border-0"
+          >
+            <CheckCircle size={18} color="white" />
+            <span className="text-[10px] font-bold text-white">All Clear</span>
+          </button>
+        </div>
+      )}
+
+      {/* ── BAT SIGNAL BUTTON ── */}
+      {!batSignal.active && (
+        <button
+          onClick={activateBatSignal}
+          className="w-full rounded-2xl p-5 mb-5 flex flex-col items-center gap-2 cursor-pointer active:scale-[0.97] transition-all duration-150 border-0"
+          style={{
+            background: "linear-gradient(135deg, #1a1a2e, #16213e)",
+            boxShadow: "0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)",
+          }}
+        >
+          <span className="text-5xl" style={{ filter: "drop-shadow(0 0 12px rgba(255,200,0,0.8))" }}>🦇</span>
+          <div className="text-white font-extrabold text-[17px] tracking-wide">BAT SIGNAL</div>
+          <div className="text-white/50 text-[12px]">Booth is slammed — call all hands</div>
+        </button>
+      )}
+
+      <h2 className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: "var(--text-muted)" }}>
+        Team · {summaryParts.join(" · ") || "All off"}
+      </h2>
 
       {/* Team cards */}
-      <div className="space-y-2.5 mb-6">
+      <div className="space-y-2.5 mb-4">
         {team.map((member, i) => {
           const cfg = statusConfig[member.status]
           return (
@@ -130,16 +221,8 @@ export function TeamStatusPage() {
         })}
       </div>
 
-      <div className="text-[11px] font-bold tracking-widest uppercase mb-1" style={{ color: "var(--text-muted)" }}>
+      <div className="text-[11px] mb-6" style={{ color: "var(--text-muted)" }}>
         Tap a card to cycle status
-      </div>
-      <div className="flex flex-wrap gap-2 mb-6">
-        {statusOrder.map((s) => (
-          <span key={s} className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-            style={{ background: statusConfig[s].bg, color: statusConfig[s].color }}>
-            {statusConfig[s].label}
-          </span>
-        ))}
       </div>
 
       {/* Lead goal progress */}
