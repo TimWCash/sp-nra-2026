@@ -75,7 +75,7 @@ export const team: TeamMember[] = [
       { label: "✈️ ORD → SYR", detail: "May 20 · 10:35am" },
     ],
     notes: ["🏠 Airbnb"],
-    linkedin: "https://www.linkedin.com/in/brianholmgren/",
+    linkedin: "https://www.linkedin.com/in/reece-brian/",
   },
   {
     name: "Rebecca",
@@ -101,7 +101,7 @@ export const team: TeamMember[] = [
     initials: "S",
     photo: "/team/steve.jpg",
     notes: ["🚗 Driving to Chicago", "🏠 Airbnb"],
-    linkedin: "https://www.linkedin.com/in/steve-nghe/",
+    linkedin: "https://www.linkedin.com/in/steve-crowley-445b507/",
   },
   {
     name: "Kelly",
