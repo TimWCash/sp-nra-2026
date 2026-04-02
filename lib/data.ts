@@ -67,6 +67,7 @@ export const team: TeamMember[] = [
   {
     name: "Brian",
     initials: "B",
+    photo: "/team/brian.jpg",
     flights: [
       { label: "✈️ SYR → ORD", detail: "May 15 · 10:36am · UA5964 Seat 7B" },
       { label: "✈️ ORD → SYR", detail: "May 20 · 10:35am" },
@@ -96,6 +97,7 @@ export const team: TeamMember[] = [
   {
     name: "Steve",
     initials: "S",
+    photo: "/team/steve.jpg",
     notes: ["🚗 Driving to Chicago", "🏠 Airbnb"],
     linkedin: "https://www.linkedin.com/in/steve-nghe/",
   },

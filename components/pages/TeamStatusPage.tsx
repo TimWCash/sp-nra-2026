@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react"
 import { Users, Target } from "lucide-react"
+import { team as teamData } from "@/lib/data"
 
 type MemberStatus = "at-booth" | "on-break" | "walking" | "in-meeting" | "off"
 
 interface TeamMemberStatus {
   name: string
   initials: string
+  photo?: string
   status: MemberStatus
 }
 
@@ -25,13 +27,12 @@ const statusConfig: Record<MemberStatus, { label: string; color: string; bg: str
 
 const statusOrder: MemberStatus[] = ["at-booth", "on-break", "walking", "in-meeting", "off"]
 
-const defaultTeam: TeamMemberStatus[] = [
-  { name: "Brian", initials: "B", status: "off" },
-  { name: "Rebecca", initials: "R", status: "off" },
-  { name: "Maria", initials: "M", status: "off" },
-  { name: "Steve", initials: "S", status: "off" },
-  { name: "Kelly", initials: "K", status: "off" },
-]
+const defaultTeam: TeamMemberStatus[] = teamData.map((m) => ({
+  name: m.name,
+  initials: m.initials,
+  photo: m.photo,
+  status: "off" as MemberStatus,
+}))
 
 function loadTeam(): TeamMemberStatus[] {
   if (typeof window === "undefined") return defaultTeam
@@ -101,10 +102,16 @@ export function TeamStatusPage() {
             <button key={member.name} onClick={() => cycleStatus(i)}
               className="w-full flex items-center gap-3 rounded-xl p-3.5 cursor-pointer transition-all duration-200 active:scale-[0.98] text-left"
               style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                style={{ background: cfg.bg, color: cfg.color }}>
-                {member.initials}
-              </div>
+              {member.photo ? (
+                <img src={member.photo} alt={member.name}
+                  className="w-11 h-11 rounded-full object-cover flex-shrink-0"
+                  style={{ border: `2px solid ${cfg.color}` }} />
+              ) : (
+                <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                  style={{ background: cfg.bg, color: cfg.color }}>
+                  {member.initials}
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>{member.name}</div>
                 <div className="text-[11px] font-medium" style={{ color: cfg.color }}>{cfg.label}</div>

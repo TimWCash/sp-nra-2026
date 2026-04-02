@@ -2,20 +2,13 @@
 
 import { MapPin, Calendar, Clock, Building2, Store, Users, MessageCircle, ExternalLink, Wifi, Mic, UserPlus, Zap, Target, Trophy, ArrowRight } from "lucide-react"
 import { useCountdown } from "@/hooks/useCountdown"
+import { team as teamMembers } from "@/lib/data"
 
 import type { PageId } from "@/components/layout/BottomNav"
 
 interface HomePageProps {
   onNavigate?: (page: PageId) => void
 }
-
-const teamMembers = [
-  { name: "Brian", initials: "B" },
-  { name: "Rebecca", initials: "R" },
-  { name: "Maria", initials: "M" },
-  { name: "Steve", initials: "S" },
-  { name: "Kelly", initials: "K" },
-]
 
 export function HomePage({ onNavigate }: HomePageProps) {
   const { days, hours, mins, secs, isLive } = useCountdown()
@@ -138,10 +131,15 @@ export function HomePage({ onNavigate }: HomePageProps) {
         <div className="flex gap-3">
           {teamMembers.map((m) => (
             <div key={m.name} className="flex flex-col items-center gap-1">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
-                style={{ background: "var(--accent-light)", color: "var(--accent)", border: "2px solid var(--accent)" }}>
-                {m.initials}
-              </div>
+              {m.photo ? (
+                <img src={m.photo} alt={m.name} className="w-10 h-10 rounded-full object-cover"
+                  style={{ border: "2px solid var(--accent)" }} />
+              ) : (
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
+                  style={{ background: "var(--accent-light)", color: "var(--accent)", border: "2px solid var(--accent)" }}>
+                  {m.initials}
+                </div>
+              )}
               <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>{m.name}</span>
             </div>
           ))}
