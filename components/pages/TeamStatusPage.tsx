@@ -18,9 +18,6 @@ const LEADS_KEY = "sp_nra_leads"
 const BAT_SIGNAL_KEY = "sp_bat_signal"
 const DAILY_GOAL = 20
 
-// Bat signal SMS — opens Messages with pre-filled text to paste into group chat
-const BAT_SIGNAL_SMS = "sms:?body=🦇 BAT SIGNAL — Booth %237365 is SLAMMED. Need all hands NOW! Come back ASAP."
-
 const statusConfig: Record<MemberStatus, { label: string; color: string; bg: string }> = {
   "at-booth": { label: "At Booth", color: "var(--success)", bg: "var(--success-light)" },
   "on-break": { label: "On Break", color: "var(--amber)", bg: "var(--amber-light)" },
@@ -59,14 +56,22 @@ function getLeadCount(): number {
   } catch { return 0 }
 }
 
-function getBatSignal(): { active: boolean; since: number } {
-  if (typeof window === "undefined") return { active: false, since: 0 }
+async function fetchBatSignal(): Promise<{ active: boolean; since: number }> {
   try {
-    return JSON.parse(localStorage.getItem(BAT_SIGNAL_KEY) || '{"active":false,"since":0}')
+    const res = await fetch("/api/bat-signal", { cache: "no-store" })
+    return await res.json()
   } catch { return { active: false, since: 0 } }
 }
 
-function setBatSignal(active: boolean) {
+async function postBatSignal(active: boolean): Promise<void> {
+  try {
+    await fetch("/api/bat-signal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active }),
+    })
+  } catch { /* ignore */ }
+  // Also mirror to localStorage as instant local feedback
   localStorage.setItem(BAT_SIGNAL_KEY, JSON.stringify({ active, since: active ? Date.now() : 0 }))
 }
 
@@ -79,13 +84,13 @@ export function TeamStatusPage() {
   useEffect(() => {
     setTeam(loadTeam())
     setLeadCount(getLeadCount())
-    setBatSignalState(getBatSignal())
+    fetchBatSignal().then(setBatSignalState)
   }, [])
 
-  // Poll localStorage every 5s so other devices see bat signal when they open the app
+  // Poll server every 5s — all 5 phones stay in sync
   useEffect(() => {
     const interval = setInterval(() => {
-      setBatSignalState(getBatSignal())
+      fetchBatSignal().then(setBatSignalState)
       setLeadCount(getLeadCount())
     }, 5000)
     return () => clearInterval(interval)
@@ -106,16 +111,15 @@ export function TeamStatusPage() {
     saveTeam(updated)
   }
 
-  const activateBatSignal = useCallback(() => {
-    setBatSignal(true)
-    setBatSignalState({ active: true, since: Date.now() })
-    // Open SMS with pre-filled message
-    window.location.href = BAT_SIGNAL_SMS
+  const activateBatSignal = useCallback(async () => {
+    const now = Date.now()
+    setBatSignalState({ active: true, since: now })
+    await postBatSignal(true)
   }, [])
 
-  const clearBatSignal = useCallback(() => {
-    setBatSignal(false)
+  const clearBatSignal = useCallback(async () => {
     setBatSignalState({ active: false, since: 0 })
+    await postBatSignal(false)
   }, [])
 
   const minutesAgo = batSignal.since

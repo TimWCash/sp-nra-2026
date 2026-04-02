@@ -19,11 +19,18 @@ export function HomePage({ onNavigate }: HomePageProps) {
   const [pulse, setPulse] = useState(false)
 
   useEffect(() => {
-    const check = () => {
+    const check = async () => {
       try {
-        const s = JSON.parse(localStorage.getItem(BAT_SIGNAL_KEY) || '{"active":false}')
+        const res = await fetch("/api/bat-signal", { cache: "no-store" })
+        const s = await res.json()
         setBatActive(!!s.active)
-      } catch { setBatActive(false) }
+      } catch {
+        // fallback to localStorage
+        try {
+          const s = JSON.parse(localStorage.getItem(BAT_SIGNAL_KEY) || '{"active":false}')
+          setBatActive(!!s.active)
+        } catch { setBatActive(false) }
+      }
     }
     check()
     const interval = setInterval(check, 5000)
