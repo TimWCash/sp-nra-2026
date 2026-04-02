@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { TopBar } from "@/components/layout/TopBar"
-import { Ticker } from "@/components/layout/Ticker"
 import { BottomNav, type PageId } from "@/components/layout/BottomNav"
 import { HomePage } from "@/components/pages/HomePage"
 import { SchedulePage } from "@/components/pages/SchedulePage"
@@ -41,8 +40,7 @@ export default function App() {
   return (
     <>
       <TopBar />
-      <Ticker />
-      <main className="pt-[90px] px-4 pb-[90px] min-h-screen">
+      <main className="pt-[64px] px-4 pb-[90px] min-h-screen">
         <PageComponent onNavigate={navigate} />
       </main>
       <BottomNav active={activePage} onChange={navigate} />

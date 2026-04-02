@@ -150,7 +150,7 @@ function getDuration(timeStr: string): string {
 }
 
 export function SchedulePage() {
-  const [activeDay, setActiveDay] = useState("sat")
+  const [activeDay, setActiveDay] = useState("fri")
   const [view, setView] = useState<ViewMode>("team")
   const [filter, setFilter] = useState("all")
   const [search, setSearch] = useState("")

@@ -9,8 +9,10 @@ export interface ScheduleEvent {
 
 export const schedule: Record<string, ScheduleEvent[]> = {
   fri: [
-    { time: "Arrive", title: "Team arrives in Chicago", sub: "Check in to Airbnb · Settle in" },
-    { time: "4:00pm", title: "Prosper Accelerator Welcome Mixer", sub: "Middleby Showroom · 222 W Merchandise Mart Plaza · Free networking with foodservice leaders", highlight: "open", link: { url: "https://www.eventbrite.com/e/prosper-accelerator-welcome-mixer-tickets-1936131705049", label: "Register on Eventbrite" } },
+    { time: "Morning", title: "Team arrives in Chicago", sub: "Check in to Airbnb · Settle in" },
+    { time: "11am–4pm", title: "Exhibitor Move-In Window", sub: "North Building · Booths 5500–9200 · Booth #7365", highlight: "open" },
+    { time: "4:00pm", title: "Booth setup must be complete", sub: "Display installation deadline — no exceptions", highlight: "close" },
+    { time: "4:00pm", title: "Prosper Accelerator Welcome Mixer", sub: "Middleby Showroom · 222 W Merchandise Mart Plaza · Free networking with foodservice leaders", link: { url: "https://www.eventbrite.com/e/prosper-accelerator-welcome-mixer-tickets-1936131705049", label: "Register on Eventbrite" } },
     { time: "6:00pm", title: "Mixer ends", sub: "Team dinner · Final prep for tomorrow" },
   ],
   sat: [
