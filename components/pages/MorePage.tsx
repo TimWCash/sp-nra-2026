@@ -19,11 +19,19 @@ interface MorePageProps {
 const HOW_TO: { q: string; a: string }[] = [
   {
     q: "How do I capture a lead?",
-    a: "Tap Leads in the bottom nav → tap the + button → fill in what you know (even just a name is fine) → pick who's logging it → set the heat level → Save. It syncs to Google Sheets automatically.",
+    a: "Tap Leads in the bottom nav → tap the + button → scan their badge or business card to auto-fill the form → pick who's logging it → set the heat level → Save. Leads sync instantly to all team phones.",
   },
   {
-    q: "How do I snap a badge photo?",
-    a: "In the lead form, tap 'Snap badge photo' — it opens your camera pointed outward. Snap the attendee's badge and it gets saved with the lead.",
+    q: "How do I scan a badge or business card?",
+    a: "In the lead form, tap 'Scan Badge or Business Card' — it opens your camera. Point it at their badge or business card and it auto-fills name, company, title, and contact info. The photo is saved with the lead too.",
+  },
+  {
+    q: "How do I find someone on LinkedIn after scanning?",
+    a: "After a successful scan, a blue 'Find on LinkedIn' button appears. Tap it to open a Google search scoped to LinkedIn using their name and company.",
+  },
+  {
+    q: "Can the whole team see leads?",
+    a: "Yes — leads sync in real-time across all team phones. When anyone logs a lead, everyone sees it instantly.",
   },
   {
     q: "How does the Bat Signal work?",
@@ -38,20 +46,24 @@ const HOW_TO: { q: string; a: string }[] = [
     a: "In Safari: tap the Share icon → 'Add to Home Screen' → Add. In Chrome: tap the 3-dot menu → 'Add to Home Screen'. Once installed, it works offline and push notifications work.",
   },
   {
-    q: "How do I book a podcast guest?",
-    a: "Go to More → Podcast (or tap Podcast in the quick nav). Pick an open 15-minute slot, enter the guest's info, and tap Confirm. They'll appear on the schedule.",
-  },
-  {
     q: "How do I update my team status?",
     a: "Go to Team → tap your card to cycle through: At Booth → On Break → Walking Floor → In Meeting → Off. Everyone with the app open will see your status.",
   },
   {
+    q: "How do I star NRA sessions I want to attend?",
+    a: "Go to Schedule → NRA Sessions → tap the ☆ star on any session to save it. Then filter by '☆ My Sessions' to see just your picks. SP-recommended sessions are pre-marked with ⭐.",
+  },
+  {
+    q: "How do I update flight info?",
+    a: "Go to Team → find your card → tap Edit → add, change, or remove your flight details. Changes are saved on your device.",
+  },
+  {
     q: "How do I add a session to my calendar?",
-    a: "Go to Schedule → NRA Sessions tab → tap any session → tap 'Add to Calendar'. Choose Google Calendar or download the .ics file for Outlook.",
+    a: "Go to Schedule → NRA Sessions → tap any session → tap 'Add to Calendar'. Choose Google Calendar or download the .ics file for Outlook/Apple Calendar.",
   },
   {
     q: "Does it work without WiFi?",
-    a: "Yes — once you've opened the app at least once, the core content (schedule, talking points, booth info, load-in guide) is cached and works offline. Lead capture saves locally and syncs when you're back online.",
+    a: "Yes — once you've opened the app at least once, the core content (schedule, talking points, booth info, load-in guide) is cached and works offline. Lead scanning requires a connection to read the card.",
   },
 ]
 
