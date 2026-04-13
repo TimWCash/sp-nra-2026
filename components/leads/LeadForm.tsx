@@ -159,7 +159,7 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
             opacity: scanning ? 0.7 : 1,
           }}>
           {scanning ? <Loader2 size={17} className="animate-spin" /> : <ScanLine size={17} />}
-          {scanning ? "Reading card..." : "Scan Business Card"}
+          {scanning ? "Reading..." : "Scan Badge or Business Card"}
         </button>
         <input ref={cardInputRef} type="file" accept="image/*" capture="environment"
           onChange={handleCardScan} className="hidden" aria-label="Scan business card" />

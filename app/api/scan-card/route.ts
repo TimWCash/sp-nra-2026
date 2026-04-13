@@ -28,14 +28,14 @@ export async function POST(req: Request) {
             },
             {
               type: "text",
-              text: `Extract contact information from this business card. Return ONLY a JSON object with these exact fields (use empty string if not found):
+              text: `Extract contact information from this image. It may be a business card or a conference/event badge. Return ONLY a JSON object with these exact fields (use empty string if not found):
 {
   "name": "full name",
   "title": "job title",
-  "company": "company name",
+  "company": "company or organization name",
   "email": "email address",
   "phone": "phone number",
-  "notes": "any other relevant info like website or address"
+  "notes": "any other relevant info like website, address, or badge/event details"
 }
 Return only valid JSON, no markdown, no explanation.`,
             },
