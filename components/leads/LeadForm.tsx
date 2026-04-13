@@ -117,8 +117,9 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
       if (data.email) setContact(data.email)
       else if (data.phone) setContact(data.phone)
       if (data.notes) setNotes(data.notes)
-    } catch {
-      setScanError("Couldn't read card — fill in manually")
+    } catch (err) {
+      console.error("Scan error:", err)
+      setScanError("Couldn't read card — try again or fill in manually")
     } finally {
       setScanning(false)
     }

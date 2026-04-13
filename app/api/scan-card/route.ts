@@ -45,7 +45,9 @@ Return only the JSON, no other text.`,
     })
 
     const text = response.content[0].type === "text" ? response.content[0].text : ""
-    const parsed = JSON.parse(text.trim())
+    // Strip markdown code blocks if Claude wrapped the JSON
+    const cleaned = text.trim().replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "")
+    const parsed = JSON.parse(cleaned)
 
     return NextResponse.json(parsed)
   } catch (err) {

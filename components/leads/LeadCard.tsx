@@ -20,7 +20,7 @@ function HeatBadge({ heat }: { heat: string }) {
 
 interface LeadCardProps {
   lead: Lead
-  onDelete: (id: number) => void
+  onDelete: (id: string) => void
 }
 
 export function LeadCard({ lead, onDelete }: LeadCardProps) {

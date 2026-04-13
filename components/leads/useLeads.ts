@@ -1,18 +1,12 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import {
-  syncLead,
-  syncPending,
-  computeSyncStatus,
-  getPendingCount,
-  type SyncStatus,
-} from "@/lib/sheets-sync"
+import { supabase } from "@/lib/supabase"
 
 export type HeatLevel = "hot" | "warm" | "cool"
 
 export interface Lead {
-  id: number
+  id: string
   name: string
   company: string
   role: string
@@ -24,94 +18,75 @@ export interface Lead {
   capturedBy?: string
 }
 
-const STORAGE_KEY = "sp_nra_leads"
-
-function loadLeads(): Lead[] {
-  if (typeof window === "undefined") return []
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")
-  } catch {
-    return []
+function dbRowToLead(row: Record<string, unknown>): Lead {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    company: (row.company as string) || "",
+    role: (row.role as string) || "",
+    contact: (row.contact as string) || "",
+    notes: (row.notes as string) || "",
+    heat: (row.heat as HeatLevel) || "warm",
+    time: new Date(row.created_at as string).toLocaleString("en-US", {
+      month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true,
+    }),
+    badgePhoto: (row.badge_photo as string) || undefined,
+    capturedBy: (row.captured_by as string) || undefined,
   }
 }
 
 export function useLeads() {
   const [leads, setLeads] = useState<Lead[]>([])
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle")
-  const [pendingCount, setPendingCount] = useState(0)
-  const [isSyncing, setIsSyncing] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  const fetchLeads = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("nra_leads")
+      .select("*")
+      .order("created_at", { ascending: false })
+
+    if (!error && data) {
+      setLeads(data.map(dbRowToLead))
+    }
+    setLoading(false)
+  }, [])
 
   useEffect(() => {
-    const loaded = loadLeads()
-    setLeads(loaded)
-    setSyncStatus(computeSyncStatus(loaded))
-    setPendingCount(getPendingCount())
-  }, [])
+    fetchLeads()
 
-  const refreshSyncState = useCallback((currentLeads: Lead[]) => {
-    setSyncStatus(computeSyncStatus(currentLeads))
-    setPendingCount(getPendingCount())
-  }, [])
+    // Real-time: refresh when any device adds/removes a lead
+    const channel = supabase
+      .channel("nra_leads_changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "nra_leads" }, () => {
+        fetchLeads()
+      })
+      .subscribe()
 
-  const save = useCallback((updated: Lead[]) => {
-    setLeads(updated)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-  }, [])
+    return () => { supabase.removeChannel(channel) }
+  }, [fetchLeads])
 
   const addLead = useCallback(async (data: Omit<Lead, "id" | "time">) => {
-    const lead: Lead = {
-      ...data,
-      id: Date.now(),
-      time: new Date().toLocaleString("en-US", {
-        month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true,
-      }),
-    }
-    const updated = [lead, ...loadLeads()]
-    save(updated)
-
-    // Fire-and-forget sync to Google Sheets
-    setSyncStatus("syncing")
-    syncLead(lead).then(() => {
-      refreshSyncState(loadLeads())
+    const { error } = await supabase.from("nra_leads").insert({
+      name: data.name,
+      company: data.company || "",
+      role: data.role || "",
+      contact: data.contact || "",
+      notes: data.notes || "",
+      heat: data.heat,
+      badge_photo: data.badgePhoto || "",
+      captured_by: data.capturedBy || "",
     })
-  }, [save, refreshSyncState])
+    if (error) console.error("Failed to save lead:", error)
+    // Real-time subscription will trigger fetchLeads automatically
+  }, [])
 
-  const deleteLead = useCallback((id: number) => {
-    const updated = loadLeads().filter((l) => l.id !== id)
-    save(updated)
-    refreshSyncState(updated)
-  }, [save, refreshSyncState])
+  const deleteLead = useCallback(async (id: string) => {
+    await supabase.from("nra_leads").delete().eq("id", id)
+  }, [])
 
-  const clearAll = useCallback(() => {
-    save([])
-    refreshSyncState([])
-  }, [save, refreshSyncState])
-
-  const syncNow = useCallback(async () => {
-    if (isSyncing) return 0
-    setIsSyncing(true)
-    setSyncStatus("syncing")
-    try {
-      // First sync any pending leads
-      const count = await syncPending()
-
-      // Then try to sync any leads that aren't in the synced set yet
-      const current = loadLeads()
-      const { getSyncedIds } = await import("@/lib/sheets-sync")
-      const syncedIds = getSyncedIds()
-      const unsynced = current.filter((l) => !syncedIds.has(l.id))
-      let extraSynced = 0
-      for (const lead of unsynced) {
-        const ok = await syncLead(lead)
-        if (ok) extraSynced++
-      }
-
-      refreshSyncState(loadLeads())
-      return count + extraSynced
-    } finally {
-      setIsSyncing(false)
-    }
-  }, [isSyncing, refreshSyncState])
+  const clearAll = useCallback(async () => {
+    await supabase.from("nra_leads").delete().neq("id", "00000000-0000-0000-0000-000000000000")
+  }, [])
 
   const exportCSV = useCallback(() => {
     if (leads.length === 0) return
@@ -157,14 +132,16 @@ export function useLeads() {
   return {
     leads,
     stats,
+    loading,
     addLead,
     deleteLead,
     clearAll,
     exportCSV,
     copyAll,
-    syncStatus,
-    pendingCount,
-    isSyncing,
-    syncNow,
+    // Keep these for compatibility with existing UI
+    syncStatus: "synced" as const,
+    pendingCount: 0,
+    isSyncing: false,
+    syncNow: async () => 0,
   }
 }

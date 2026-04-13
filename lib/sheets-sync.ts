@@ -12,17 +12,17 @@ const PENDING_KEY = "sp_nra_sheets_pending"
 const SYNCED_KEY = "sp_nra_sheets_synced"
 
 /** IDs of leads that have been synced successfully. */
-export function getSyncedIds(): Set<number> {
+export function getSyncedIds(): Set<string> {
   if (typeof window === "undefined") return new Set()
   try {
     const raw = localStorage.getItem(SYNCED_KEY)
-    return new Set<number>(raw ? JSON.parse(raw) : [])
+    return new Set<string>(raw ? JSON.parse(raw) : [])
   } catch {
     return new Set()
   }
 }
 
-function saveSyncedIds(ids: Set<number>) {
+function saveSyncedIds(ids: Set<string>) {
   localStorage.setItem(SYNCED_KEY, JSON.stringify([...ids]))
 }
 
