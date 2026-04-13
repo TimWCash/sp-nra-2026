@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { X, Flame, Sun, Snowflake, Camera, Trash2, User } from "lucide-react"
+import { X, Flame, Sun, Snowflake, Camera, Trash2, User, ScanLine, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { HeatLevel } from "./useLeads"
 
@@ -50,7 +50,10 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
   const [capturedByError, setCapturedByError] = useState(false)
   const [badgePhoto, setBadgePhoto] = useState<string | undefined>()
   const [capturedBy, setCapturedBy] = useState("")
+  const [scanning, setScanning] = useState(false)
+  const [scanError, setScanError] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cardInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (open) setCapturedBy(getSavedCapturedBy())
@@ -73,7 +76,7 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
       return
     }
     onSave({ name: name.trim(), company: company.trim(), role: role.trim(), contact: contact.trim(), notes: notes.trim(), heat, badgePhoto, capturedBy })
-    setName(""); setCompany(""); setRole(""); setContact(""); setNotes(""); setHeat("warm"); setNameError(false); setCapturedByError(false); setBadgePhoto(undefined)
+    setName(""); setCompany(""); setRole(""); setContact(""); setNotes(""); setHeat("warm"); setNameError(false); setCapturedByError(false); setBadgePhoto(undefined); setScanError("")
     onClose()
   }
 
@@ -83,6 +86,42 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
     const resized = await resizeImage(file, 800)
     setBadgePhoto(resized)
     if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  async function handleCardScan(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (cardInputRef.current) cardInputRef.current.value = ""
+
+    setScanning(true)
+    setScanError("")
+
+    try {
+      const resized = await resizeImage(file, 1200)
+      // Strip the data:image/jpeg;base64, prefix
+      const base64 = resized.split(",")[1]
+      const mediaType = resized.split(";")[0].replace("data:", "")
+
+      const res = await fetch("/api/scan-card", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: base64, mediaType }),
+      })
+
+      if (!res.ok) throw new Error("Scan failed")
+      const data = await res.json()
+
+      if (data.name) { setName(data.name); setNameError(false) }
+      if (data.company) setCompany(data.company)
+      if (data.title) setRole(data.title)
+      if (data.email) setContact(data.email)
+      else if (data.phone) setContact(data.phone)
+      if (data.notes) setNotes(data.notes)
+    } catch {
+      setScanError("Couldn't read card — fill in manually")
+    } finally {
+      setScanning(false)
+    }
   }
 
   const inputCls = "w-full rounded-lg text-[15px] px-3.5 py-3 mb-2.5 outline-none transition-all duration-200"
@@ -99,7 +138,26 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
             <X size={16} />
           </button>
         </div>
-        <p className="text-[13px] mb-4" style={{ color: "var(--text-muted)" }}>Fill in what you know - even just a name is fine.</p>
+        {/* Business Card Scanner */}
+        <button
+          onClick={() => cardInputRef.current?.click()}
+          disabled={scanning}
+          className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 mb-4 font-bold text-[14px] cursor-pointer transition-all duration-200 active:scale-[0.98]"
+          style={{
+            background: "var(--accent)",
+            color: "var(--accent-fg)",
+            border: "none",
+            opacity: scanning ? 0.7 : 1,
+          }}>
+          {scanning ? <Loader2 size={17} className="animate-spin" /> : <ScanLine size={17} />}
+          {scanning ? "Reading card..." : "Scan Business Card"}
+        </button>
+        <input ref={cardInputRef} type="file" accept="image/*" capture="environment"
+          onChange={handleCardScan} className="hidden" aria-label="Scan business card" />
+        {scanError && (
+          <p className="text-[12px] mb-3 text-center font-medium" style={{ color: "var(--danger)" }}>{scanError}</p>
+        )}
+        <p className="text-[13px] mb-4" style={{ color: "var(--text-muted)" }}>Or fill in manually — even just a name is fine.</p>
 
         {/* Captured By */}
         <div className="flex items-center justify-between mb-2">
