@@ -101,6 +101,8 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
 
     try {
       const resized = await resizeImage(file, 1200)
+      // Save photo to display in the form
+      setBadgePhoto(resized)
       // Strip the data:image/jpeg;base64, prefix
       const base64 = resized.split(",")[1]
       const mediaType = resized.split(";")[0].replace("data:", "")
@@ -147,36 +149,7 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
             <X size={16} />
           </button>
         </div>
-        {/* Business Card Scanner */}
-        <button
-          onClick={() => cardInputRef.current?.click()}
-          disabled={scanning}
-          className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 mb-4 font-bold text-[14px] cursor-pointer transition-all duration-200 active:scale-[0.98]"
-          style={{
-            background: "var(--accent)",
-            color: "var(--accent-fg)",
-            border: "none",
-            opacity: scanning ? 0.7 : 1,
-          }}>
-          {scanning ? <Loader2 size={17} className="animate-spin" /> : <ScanLine size={17} />}
-          {scanning ? "Reading..." : "Scan Badge or Business Card"}
-        </button>
-        <input ref={cardInputRef} type="file" accept="image/*" capture="environment"
-          onChange={handleCardScan} className="hidden" aria-label="Scan business card" />
-        {scanError && (
-          <p className="text-[12px] mb-3 text-center font-medium" style={{ color: "var(--danger)" }}>{scanError}</p>
-        )}
-        {scanSuccess && !scanError && (
-          <p className="text-[12px] mb-3 text-center font-medium" style={{ color: "var(--success)" }}>✓ Card scanned — review fields below</p>
-        )}
-        {linkedinUrl && (
-          <a href={linkedinUrl} target="_blank" rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-2 rounded-xl py-3 mb-3 font-semibold text-[13px] no-underline transition-all duration-200 active:scale-[0.98]"
-            style={{ background: "#0a66c2", color: "#fff", border: "none" }}>
-            <span>🔗</span> Find on LinkedIn
-          </a>
-        )}
-        <p className="text-[13px] mb-4" style={{ color: "var(--text-muted)" }}>Or fill in manually — even just a name is fine.</p>
+        <p className="text-[13px] mb-4" style={{ color: "var(--text-muted)" }}>Scan a badge or card to auto-fill, or enter manually.</p>
 
         {/* Captured By */}
         <div className="flex items-center justify-between mb-2">
@@ -199,12 +172,12 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
           ))}
         </div>
 
-        {/* Badge Photo */}
-        <div className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: "var(--text-muted)" }}>Badge Photo</div>
+        {/* Scan Badge / Business Card */}
+        <div className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: "var(--text-muted)" }}>Scan Badge or Card</div>
         {badgePhoto ? (
           <div className="relative mb-3 rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
             <img src={badgePhoto} alt="Badge" className="w-full max-h-[200px] object-cover" />
-            <button onClick={() => setBadgePhoto(undefined)}
+            <button onClick={() => { setBadgePhoto(undefined); setScanSuccess(false); setLinkedinUrl("") }}
               className="absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"
               style={{ background: "rgba(0,0,0,0.6)", color: "white", border: "none" }}
               aria-label="Remove photo">
@@ -212,15 +185,37 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
             </button>
           </div>
         ) : (
-          <button onClick={() => fileInputRef.current?.click()}
-            className="w-full flex items-center justify-center gap-2 rounded-lg py-4 mb-3 cursor-pointer transition-all duration-200 active:scale-[0.98]"
-            style={{ background: "var(--surface-alt)", border: "2px dashed var(--border-strong)", color: "var(--text-muted)" }}>
-            <Camera size={18} />
-            <span className="text-sm font-medium">Snap badge photo</span>
+          <button
+            onClick={() => cardInputRef.current?.click()}
+            disabled={scanning}
+            className="w-full flex items-center justify-center gap-2 rounded-xl py-4 mb-3 font-bold text-[14px] cursor-pointer transition-all duration-200 active:scale-[0.98]"
+            style={{
+              background: "var(--accent)",
+              color: "var(--accent-fg)",
+              border: "none",
+              opacity: scanning ? 0.7 : 1,
+            }}>
+            {scanning ? <Loader2 size={17} className="animate-spin" /> : <ScanLine size={17} />}
+            {scanning ? "Reading..." : "Scan Badge or Business Card"}
           </button>
         )}
+        <input ref={cardInputRef} type="file" accept="image/*" capture="environment"
+          onChange={handleCardScan} className="hidden" aria-label="Scan badge or business card" />
         <input ref={fileInputRef} type="file" accept="image/*" capture="environment"
           onChange={handlePhoto} className="hidden" aria-label="Capture badge photo" />
+        {scanError && (
+          <p className="text-[12px] mb-2 text-center font-medium" style={{ color: "var(--danger)" }}>{scanError}</p>
+        )}
+        {scanSuccess && !scanError && (
+          <p className="text-[12px] mb-1 text-center font-medium" style={{ color: "var(--success)" }}>✓ Scanned — review fields below</p>
+        )}
+        {linkedinUrl && (
+          <a href={linkedinUrl} target="_blank" rel="noopener noreferrer"
+            className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 mb-3 font-semibold text-[13px] no-underline transition-all duration-200 active:scale-[0.98]"
+            style={{ background: "#0a66c2", color: "#fff", border: "none" }}>
+            <span>🔗</span> Find on LinkedIn
+          </a>
+        )}
 
         <div ref={detailsRef} className="text-[11px] font-bold tracking-widest uppercase mb-2 mt-1" style={{ color: "var(--text-muted)" }}>Details</div>
         <input className={cn(inputCls, nameError && "ring-2 ring-[var(--danger)]")} placeholder="Name *" value={name}
