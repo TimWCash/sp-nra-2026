@@ -52,6 +52,7 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
   const [capturedBy, setCapturedBy] = useState("")
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState("")
+  const [linkedinUrl, setLinkedinUrl] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cardInputRef = useRef<HTMLInputElement>(null)
 
@@ -76,7 +77,7 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
       return
     }
     onSave({ name: name.trim(), company: company.trim(), role: role.trim(), contact: contact.trim(), notes: notes.trim(), heat, badgePhoto, capturedBy })
-    setName(""); setCompany(""); setRole(""); setContact(""); setNotes(""); setHeat("warm"); setNameError(false); setCapturedByError(false); setBadgePhoto(undefined); setScanError("")
+    setName(""); setCompany(""); setRole(""); setContact(""); setNotes(""); setHeat("warm"); setNameError(false); setCapturedByError(false); setBadgePhoto(undefined); setScanError(""); setLinkedinUrl("")
     onClose()
   }
 
@@ -117,6 +118,7 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
       if (data.email) setContact(data.email)
       else if (data.phone) setContact(data.phone)
       if (data.notes) setNotes(data.notes)
+      if (data.linkedinSearchUrl) setLinkedinUrl(data.linkedinSearchUrl)
     } catch (err) {
       console.error("Scan error:", err)
       setScanError("Couldn't read card — try again or fill in manually")
@@ -157,6 +159,13 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
           onChange={handleCardScan} className="hidden" aria-label="Scan business card" />
         {scanError && (
           <p className="text-[12px] mb-3 text-center font-medium" style={{ color: "var(--danger)" }}>{scanError}</p>
+        )}
+        {linkedinUrl && (
+          <a href={linkedinUrl} target="_blank" rel="noopener noreferrer"
+            className="w-full flex items-center justify-center gap-2 rounded-xl py-3 mb-3 font-semibold text-[13px] no-underline transition-all duration-200 active:scale-[0.98]"
+            style={{ background: "#0a66c2", color: "#fff", border: "none" }}>
+            <span>🔗</span> Find on LinkedIn
+          </a>
         )}
         <p className="text-[13px] mb-4" style={{ color: "var(--text-muted)" }}>Or fill in manually — even just a name is fine.</p>
 

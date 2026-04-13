@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     }
 
     const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
+      model: "claude-3-5-haiku-20241022",
       max_tokens: 512,
       messages: [
         {
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
             },
             {
               type: "text",
-              text: `Extract contact information from this business card. Return ONLY a JSON object with these fields (use empty string if not found):
+              text: `Extract contact information from this business card. Return ONLY a JSON object with these exact fields (use empty string if not found):
 {
   "name": "full name",
   "title": "job title",
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   "phone": "phone number",
   "notes": "any other relevant info like website or address"
 }
-Return only the JSON, no other text.`,
+Return only valid JSON, no markdown, no explanation.`,
             },
           ],
         },
@@ -45,9 +45,15 @@ Return only the JSON, no other text.`,
     })
 
     const text = response.content[0].type === "text" ? response.content[0].text : ""
-    // Strip markdown code blocks if Claude wrapped the JSON
+    // Strip markdown code blocks if present
     const cleaned = text.trim().replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "")
     const parsed = JSON.parse(cleaned)
+
+    // Build a LinkedIn Google search URL from name + company
+    const query = [parsed.name, parsed.company].filter(Boolean).join(" ")
+    parsed.linkedinSearchUrl = query
+      ? `https://www.google.com/search?q=site:linkedin.com/in+${encodeURIComponent(query)}`
+      : ""
 
     return NextResponse.json(parsed)
   } catch (err) {
