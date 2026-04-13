@@ -52,7 +52,9 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
   const [capturedBy, setCapturedBy] = useState("")
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState("")
+  const [scanSuccess, setScanSuccess] = useState(false)
   const [linkedinUrl, setLinkedinUrl] = useState("")
+  const detailsRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cardInputRef = useRef<HTMLInputElement>(null)
 
@@ -77,7 +79,7 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
       return
     }
     onSave({ name: name.trim(), company: company.trim(), role: role.trim(), contact: contact.trim(), notes: notes.trim(), heat, badgePhoto, capturedBy })
-    setName(""); setCompany(""); setRole(""); setContact(""); setNotes(""); setHeat("warm"); setNameError(false); setCapturedByError(false); setBadgePhoto(undefined); setScanError(""); setLinkedinUrl("")
+    setName(""); setCompany(""); setRole(""); setContact(""); setNotes(""); setHeat("warm"); setNameError(false); setCapturedByError(false); setBadgePhoto(undefined); setScanError(""); setScanSuccess(false); setLinkedinUrl("")
     onClose()
   }
 
@@ -119,6 +121,10 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
       else if (data.phone) setContact(data.phone)
       if (data.notes) setNotes(data.notes)
       if (data.linkedinSearchUrl) setLinkedinUrl(data.linkedinSearchUrl)
+      setScanSuccess(true)
+      setTimeout(() => {
+        detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+      }, 100)
     } catch (err) {
       console.error("Scan error:", err)
       setScanError("Couldn't read card — try again or fill in manually")
@@ -155,10 +161,13 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
           {scanning ? <Loader2 size={17} className="animate-spin" /> : <ScanLine size={17} />}
           {scanning ? "Reading card..." : "Scan Business Card"}
         </button>
-        <input ref={cardInputRef} type="file" accept="image/*" capture="environment"
+        <input ref={cardInputRef} type="file" accept="image/*"
           onChange={handleCardScan} className="hidden" aria-label="Scan business card" />
         {scanError && (
           <p className="text-[12px] mb-3 text-center font-medium" style={{ color: "var(--danger)" }}>{scanError}</p>
+        )}
+        {scanSuccess && !scanError && (
+          <p className="text-[12px] mb-3 text-center font-medium" style={{ color: "var(--success)" }}>✓ Card scanned — review fields below</p>
         )}
         {linkedinUrl && (
           <a href={linkedinUrl} target="_blank" rel="noopener noreferrer"
@@ -213,7 +222,7 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
         <input ref={fileInputRef} type="file" accept="image/*" capture="environment"
           onChange={handlePhoto} className="hidden" aria-label="Capture badge photo" />
 
-        <div className="text-[11px] font-bold tracking-widest uppercase mb-2 mt-1" style={{ color: "var(--text-muted)" }}>Details</div>
+        <div ref={detailsRef} className="text-[11px] font-bold tracking-widest uppercase mb-2 mt-1" style={{ color: "var(--text-muted)" }}>Details</div>
         <input className={cn(inputCls, nameError && "ring-2 ring-[var(--danger)]")} placeholder="Name *" value={name}
           onChange={(e) => { setName(e.target.value); setNameError(false) }}
           style={{ background: "var(--surface-alt)", border: "1px solid var(--border)", color: "var(--text)" }} />
