@@ -161,7 +161,7 @@ export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
           {scanning ? <Loader2 size={17} className="animate-spin" /> : <ScanLine size={17} />}
           {scanning ? "Reading card..." : "Scan Business Card"}
         </button>
-        <input ref={cardInputRef} type="file" accept="image/*"
+        <input ref={cardInputRef} type="file" accept="image/*" capture="environment"
           onChange={handleCardScan} className="hidden" aria-label="Scan business card" />
         {scanError && (
           <p className="text-[12px] mb-3 text-center font-medium" style={{ color: "var(--danger)" }}>{scanError}</p>
