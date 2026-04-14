@@ -13,10 +13,13 @@ function getSavedCapturedBy(): string {
   return localStorage.getItem(CAPTURED_BY_KEY) || ""
 }
 
+import type { Lead } from "./useLeads"
+
 interface LeadFormProps {
   open: boolean
   onClose: () => void
   onSave: (data: { name: string; company: string; role: string; contact: string; notes: string; heat: HeatLevel; badgePhoto?: string; capturedBy: string }) => void
+  existingLeads?: Lead[]
 }
 
 function resizeImage(file: File, maxWidth: number): Promise<string> {
@@ -39,7 +42,7 @@ function resizeImage(file: File, maxWidth: number): Promise<string> {
   })
 }
 
-export function LeadForm({ open, onClose, onSave }: LeadFormProps) {
+export function LeadForm({ open, onClose, onSave, existingLeads = [] }: LeadFormProps) {
   const [name, setName] = useState("")
   const [company, setCompany] = useState("")
   const [role, setRole] = useState("")

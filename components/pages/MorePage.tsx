@@ -1,9 +1,12 @@
 "use client"
 
-import { useState } from "react"
-import { Copy, Mail, Users, MessageCircle, Mic, Activity, Truck, ChevronRight, HelpCircle, ChevronDown } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { Copy, Mail, Users, MessageCircle, Mic, Activity, Truck, ChevronRight, HelpCircle, ChevronDown, StickyNote, Camera } from "lucide-react"
 import { keyDates, emailTemplate } from "@/lib/data"
+import { supabase } from "@/lib/supabase"
 import type { PageId } from "@/components/layout/BottomNav"
+
+const TEAM_MEMBERS = ["Brian", "Rebecca", "Maria", "Steve", "Kelly"] as const
 
 const badgeVariant: Record<string, string> = {
   teal: "bg-sp-accent-light text-sp-accent",
@@ -70,6 +73,27 @@ const HOW_TO: { q: string; a: string }[] = [
 export function MorePage({ onNavigate }: MorePageProps) {
   const [copyLabel, setCopyLabel] = useState("Copy to clipboard")
   const [openIndex, setOpenIndex] = useState<number | null>(null)
+  const [notes, setNotes] = useState("")
+  const [notesBy, setNotesBy] = useState("")
+  const [notesSaving, setNotesSaving] = useState(false)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    const saved = localStorage.getItem("sp_nra_captured_by")
+    if (saved) setNotesBy(saved)
+    supabase.from("team_notes").select("content").eq("id", 1).single()
+      .then(({ data }) => { if (data) setNotes(data.content || "") })
+  }, [])
+
+  function handleNotesChange(val: string) {
+    setNotes(val)
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    setNotesSaving(true)
+    saveTimer.current = setTimeout(async () => {
+      await supabase.from("team_notes").update({ content: val, updated_at: new Date().toISOString(), updated_by: notesBy }).eq("id", 1)
+      setNotesSaving(false)
+    }, 1000)
+  }
 
   function copyEmail() {
     navigator.clipboard.writeText(emailTemplate).then(() => {
@@ -109,9 +133,30 @@ export function MorePage({ onNavigate }: MorePageProps) {
         ))}
       </div>
 
+      {/* Shared Notes */}
+      <SectionLabel>Team Notes</SectionLabel>
+      <div className="rounded-xl overflow-hidden mb-6" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+        <div className="flex items-center justify-between px-4 pt-3 pb-2">
+          <div className="flex items-center gap-1.5">
+            <StickyNote size={13} style={{ color: "var(--accent)" }} />
+            <span className="text-[11px] font-semibold" style={{ color: "var(--text-muted)" }}>Shared with the whole team</span>
+          </div>
+          {notesSaving && <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>Saving…</span>}
+          {!notesSaving && notes && <span className="text-[10px]" style={{ color: "var(--success, #22c55e)" }}>✓ Saved</span>}
+        </div>
+        <textarea
+          value={notes}
+          onChange={(e) => handleNotesChange(e.target.value)}
+          placeholder="Quick observations, competitor intel, ideas, reminders…"
+          className="w-full px-4 pb-4 text-[13px] leading-relaxed resize-none outline-none bg-transparent"
+          style={{ color: "var(--text)", minHeight: "120px", border: "none" }}
+        />
+      </div>
+
       {/* Quick Nav */}
       <div className="space-y-1.5 mb-6">
         {[
+          { page: "photos" as PageId, Icon: Camera, label: "Show Photos", sub: "Shared team album" },
           { page: "team" as PageId, Icon: Users, label: "Team", sub: "Travel & contacts" },
           { page: "talk" as PageId, Icon: MessageCircle, label: "Talking Points", sub: "At the booth" },
           { page: "podcast" as PageId, Icon: Mic, label: "Podcast", sub: "Joy of Ops schedule" },

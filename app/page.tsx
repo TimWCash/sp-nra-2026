@@ -14,6 +14,7 @@ import { PodcastPage } from "@/components/pages/PodcastPage"
 import { TeamStatusPage } from "@/components/pages/TeamStatusPage"
 import { LoadInOutPage } from "@/components/pages/LoadInOutPage"
 import { MorePage } from "@/components/pages/MorePage"
+import { PhotosPage } from "@/components/pages/PhotosPage"
 
 const pages: Record<PageId, React.ComponentType<{ onNavigate?: (page: PageId) => void }>> = {
   home: HomePage,
@@ -26,6 +27,7 @@ const pages: Record<PageId, React.ComponentType<{ onNavigate?: (page: PageId) =>
   status: TeamStatusPage,
   loadin: LoadInOutPage,
   more: MorePage,
+  photos: PhotosPage,
 }
 
 export default function App() {

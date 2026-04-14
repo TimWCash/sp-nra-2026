@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { MapPin, Calendar, Clock, Building2, Store, Users, MessageCircle, ExternalLink, Wifi, Mic, UserPlus, Zap, Target, Trophy, ArrowRight } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
+import { MapPin, Calendar, Clock, Building2, Store, Users, MessageCircle, ExternalLink, Wifi, Mic, UserPlus, Zap, Target, Trophy, ArrowRight, Camera, Plus } from "lucide-react"
 import { useCountdown } from "@/hooks/useCountdown"
 import { team as teamMembers } from "@/lib/data"
+import { supabase } from "@/lib/supabase"
 
 import type { PageId } from "@/components/layout/BottomNav"
 
@@ -17,6 +18,26 @@ export function HomePage({ onNavigate }: HomePageProps) {
   const { days, hours, mins, secs, isLive } = useCountdown()
   const [batActive, setBatActive] = useState(false)
   const [pulse, setPulse] = useState(false)
+  const [visitorCount, setVisitorCount] = useState(0)
+  const [tapping, setTapping] = useState(false)
+
+  const fetchVisitors = useCallback(async () => {
+    const today = new Date().toISOString().split("T")[0]
+    const { count } = await supabase
+      .from("booth_traffic")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", today + "T00:00:00")
+    setVisitorCount(count ?? 0)
+  }, [])
+
+  useEffect(() => { fetchVisitors() }, [fetchVisitors])
+
+  async function addVisitor() {
+    setTapping(true)
+    setVisitorCount((c) => c + 1)
+    await supabase.from("booth_traffic").insert({})
+    setTimeout(() => setTapping(false), 200)
+  }
 
   useEffect(() => {
     const check = async () => {
@@ -156,6 +177,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
           { page: "talk" as PageId, Icon: MessageCircle, label: "Talk Track", sub: "At the booth", accent: "#008493" },
           { page: "podcast" as PageId, Icon: Mic, label: "Podcast", sub: "Joy of Ops", accent: "#008493" },
           { page: "leads" as PageId, Icon: UserPlus, label: "Leads", sub: "Capture contacts", accent: "#008493" },
+          { page: "photos" as PageId, Icon: Camera, label: "Photos", sub: "Shared album", accent: "#008493" },
         ].map((q) => (
           <button key={q.page + q.label} onClick={() => onNavigate?.(q.page)}
             className="rounded-xl p-3 text-left cursor-pointer transition-all duration-200 active:scale-[0.97]"
@@ -193,6 +215,29 @@ export function HomePage({ onNavigate }: HomePageProps) {
               <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>{m.name}</span>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Booth Traffic Counter */}
+      <div className="rounded-xl p-4 mb-4"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: "var(--text-muted)" }}>Booth Visitors Today</span>
+          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full" style={{ background: "var(--accent-light)", color: "var(--accent)" }}>Today</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="text-[48px] font-extrabold tabular-nums leading-none" style={{ color: "var(--accent)" }}>{visitorCount}</div>
+          <button
+            onClick={addVisitor}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl py-4 font-bold text-[16px] cursor-pointer transition-all duration-200 active:scale-[0.93]"
+            style={{
+              background: tapping ? "var(--accent)" : "var(--accent-light)",
+              color: tapping ? "var(--accent-fg)" : "var(--accent)",
+              border: "none",
+              transform: tapping ? "scale(0.93)" : "scale(1)",
+            }}>
+            <Plus size={20} /> Visitor
+          </button>
         </div>
       </div>
 
