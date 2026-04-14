@@ -89,7 +89,18 @@ export function TeamPage() {
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
-                    <div className="font-bold text-[15px]" style={{ color: "var(--text)" }}>{person.name}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="font-bold text-[15px]" style={{ color: "var(--text)" }}>{person.name}</div>
+                      {person.shift && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                          style={{
+                            background: person.shift === "day" ? "var(--amber-light)" : person.shift === "night" ? "var(--accent-light)" : "var(--surface-alt)",
+                            color: person.shift === "day" ? "var(--amber)" : person.shift === "night" ? "var(--accent)" : "var(--text-muted)",
+                          }}>
+                          {person.shift === "day" ? "☀️ Day" : person.shift === "night" ? "🌙 Night" : "☀️🌙 Both"}
+                        </span>
+                      )}
+                    </div>
                     {!isEditing ? (
                       <button onClick={() => startEdit(person.name, flights)}
                         className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg cursor-pointer border-0 transition-all active:scale-95"

@@ -60,6 +60,7 @@ export interface TeamMember {
   name: string
   initials: string
   photo?: string
+  shift?: "day" | "night" | "both"
   flights?: { label: string; detail: string }[]
   notes?: string[]
   linkedin?: string
@@ -69,6 +70,7 @@ export const team: TeamMember[] = [
   {
     name: "Brian",
     initials: "B",
+    shift: "both",
     photo: "/team/brian.jpg",
     flights: [
       { label: "✈️ SYR → ORD", detail: "May 15 · 10:36am · UA5964 Seat 7B" },
@@ -80,6 +82,7 @@ export const team: TeamMember[] = [
   {
     name: "Rebecca",
     initials: "R",
+    shift: "day",
     photo: "/team/rebecca.jpg",
     flights: [
       { label: "✈️ DFW → ORD", detail: "May 15 · 7:00am · AA1120 · Arrives 9:27am" },
@@ -89,6 +92,7 @@ export const team: TeamMember[] = [
   {
     name: "Maria",
     initials: "M",
+    shift: "both",
     photo: "/team/maria.jpg",
     flights: [
       { label: "✈️ EZE → ORD", detail: "May 14 · 9:00am" },
@@ -99,6 +103,7 @@ export const team: TeamMember[] = [
   {
     name: "Steve",
     initials: "S",
+    shift: "both",
     photo: "/team/steve.jpg",
     notes: ["🚗 Driving to Chicago", "🏠 Airbnb"],
     linkedin: "https://www.linkedin.com/in/steve-crowley-445b507/",
@@ -106,11 +111,24 @@ export const team: TeamMember[] = [
   {
     name: "Kelly",
     initials: "K",
+    shift: "night",
     photo: "/team/kelly.jpg",
     flights: [
       { label: "✈️ DFW → ORD", detail: "May 15 · 9:30am" },
       { label: "✈️ ORD → DFW", detail: "May 19 · 8:35pm" },
     ],
+  },
+  {
+    name: "Emily",
+    initials: "Em",
+    shift: "day",
+    photo: "/team/emily.jpg",
+  },
+  {
+    name: "Ellis",
+    initials: "El",
+    shift: "night",
+    photo: "/team/ellis.jpg",
   },
 ]
 

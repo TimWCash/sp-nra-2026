@@ -6,7 +6,7 @@ import { keyDates, emailTemplate } from "@/lib/data"
 import { supabase } from "@/lib/supabase"
 import type { PageId } from "@/components/layout/BottomNav"
 
-const TEAM_MEMBERS = ["Brian", "Rebecca", "Maria", "Steve", "Kelly"] as const
+const TEAM_MEMBERS = ["Brian", "Rebecca", "Maria", "Steve", "Kelly", "Emily", "Ellis"] as const
 
 const badgeVariant: Record<string, string> = {
   teal: "bg-sp-accent-light text-sp-accent",

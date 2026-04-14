@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { Camera, Trash2, X, Loader2 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
-const TEAM_MEMBERS = ["Brian", "Rebecca", "Maria", "Steve", "Kelly"] as const
+const TEAM_MEMBERS = ["Brian", "Rebecca", "Maria", "Steve", "Kelly", "Emily", "Ellis"] as const
 const TAKEN_BY_KEY = "sp_nra_captured_by"
 
 interface Photo {

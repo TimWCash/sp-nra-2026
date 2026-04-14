@@ -5,7 +5,7 @@ import { X, Flame, Sun, Snowflake, Camera, Trash2, User, ScanLine, Loader2 } fro
 import { cn } from "@/lib/utils"
 import type { HeatLevel } from "./useLeads"
 
-const TEAM_MEMBERS = ["Brian", "Rebecca", "Maria", "Steve", "Kelly"] as const
+const TEAM_MEMBERS = ["Brian", "Rebecca", "Maria", "Steve", "Kelly", "Emily", "Ellis"] as const
 const CAPTURED_BY_KEY = "sp_nra_captured_by"
 
 function getSavedCapturedBy(): string {
