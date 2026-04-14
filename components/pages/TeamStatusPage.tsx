@@ -6,6 +6,7 @@ import { team as teamData } from "@/lib/data"
 import { NotificationPermission } from "@/components/NotificationPermission"
 
 type MemberStatus = "at-booth" | "on-break" | "walking" | "in-meeting" | "off"
+type ShiftValue = "day" | "night" | "both" | undefined
 type ShiftFilter = "all" | "day" | "night"
 
 interface TeamMemberStatus {
@@ -30,12 +31,13 @@ const statusConfig: Record<MemberStatus, { label: string; color: string; bg: str
 }
 
 const statusOrder: MemberStatus[] = ["at-booth", "on-break", "walking", "in-meeting", "off"]
+const shiftOrder: ShiftValue[] = [undefined, "day", "night", "both"]
 
 const defaultTeam: TeamMemberStatus[] = teamData.map((m) => ({
   name: m.name,
   initials: m.initials,
   photo: m.photo,
-  shift: m.shift,
+  shift: undefined,
   status: "off" as MemberStatus,
 }))
 
@@ -75,7 +77,6 @@ async function postBatSignal(active: boolean): Promise<void> {
       body: JSON.stringify({ active }),
     })
   } catch { /* ignore */ }
-  // Also mirror to localStorage as instant local feedback
   localStorage.setItem(BAT_SIGNAL_KEY, JSON.stringify({ active, since: active ? Date.now() : 0 }))
 }
 
@@ -92,7 +93,6 @@ export function TeamStatusPage() {
     fetchBatSignal().then(setBatSignalState)
   }, [])
 
-  // Poll server every 5s — all 5 phones stay in sync
   useEffect(() => {
     const interval = setInterval(() => {
       fetchBatSignal().then(setBatSignalState)
@@ -101,7 +101,6 @@ export function TeamStatusPage() {
     return () => clearInterval(interval)
   }, [])
 
-  // Pulse animation while bat signal is active
   useEffect(() => {
     if (!batSignal.active) return
     const interval = setInterval(() => setPulse((p) => !p), 800)
@@ -112,6 +111,15 @@ export function TeamStatusPage() {
     const updated = [...team]
     const current = statusOrder.indexOf(updated[index].status)
     updated[index] = { ...updated[index], status: statusOrder[(current + 1) % statusOrder.length] }
+    setTeam(updated)
+    saveTeam(updated)
+  }
+
+  function cycleShift(index: number, e: React.MouseEvent) {
+    e.stopPropagation()
+    const updated = [...team]
+    const current = shiftOrder.indexOf(updated[index].shift)
+    updated[index] = { ...updated[index], shift: shiftOrder[(current + 1) % shiftOrder.length] }
     setTeam(updated)
     saveTeam(updated)
   }
@@ -131,7 +139,6 @@ export function TeamStatusPage() {
     ? Math.floor((Date.now() - batSignal.since) / 60000)
     : 0
 
-  // Summary counts
   const counts: Record<MemberStatus, number> = { "at-booth": 0, "on-break": 0, "walking": 0, "in-meeting": 0, "off": 0 }
   team.forEach((m) => counts[m.status]++)
 
@@ -149,6 +156,8 @@ export function TeamStatusPage() {
     if (shiftFilter === "night") return m.shift === "night" || m.shift === "both"
     return true
   })
+
+  const shiftsAssigned = team.some((m) => m.shift)
 
   return (
     <div className="animate-fade-in">
@@ -204,23 +213,31 @@ export function TeamStatusPage() {
         Team · {summaryParts.join(" · ") || "All off"}
       </h2>
 
-      {/* Shift filter chips */}
-      <div className="flex gap-1.5 mb-3">
-        {(["all", "day", "night"] as ShiftFilter[]).map((s) => (
-          <button key={s} onClick={() => setShiftFilter(s)}
-            className="flex-1 py-1.5 rounded-full text-[11px] font-semibold cursor-pointer transition-all duration-200 border"
-            style={{
-              background: shiftFilter === s ? (s === "night" ? "var(--accent)" : s === "day" ? "var(--amber)" : "var(--text)") : "var(--surface)",
-              color: shiftFilter === s ? (s === "night" || s === "all" ? "var(--accent-fg)" : "#fff") : "var(--text-secondary)",
-              borderColor: shiftFilter === s ? (s === "night" ? "var(--accent)" : s === "day" ? "var(--amber)" : "var(--text)") : "var(--border)",
-            }}>
-            {s === "all" ? "All" : s === "day" ? "☀️ Day" : "🌙 Night"}
-          </button>
-        ))}
-      </div>
+      {/* Shift filter chips — only show once shifts are assigned */}
+      {shiftsAssigned && (
+        <div className="flex gap-1.5 mb-3">
+          {(["all", "day", "night"] as ShiftFilter[]).map((s) => (
+            <button key={s} onClick={() => setShiftFilter(s)}
+              className="flex-1 py-1.5 rounded-full text-[11px] font-semibold cursor-pointer transition-all duration-200 border"
+              style={{
+                background: shiftFilter === s
+                  ? s === "night" ? "var(--accent)" : s === "day" ? "var(--amber)" : "var(--text)"
+                  : "var(--surface)",
+                color: shiftFilter === s
+                  ? s === "day" ? "#fff" : "var(--accent-fg)"
+                  : "var(--text-secondary)",
+                borderColor: shiftFilter === s
+                  ? s === "night" ? "var(--accent)" : s === "day" ? "var(--amber)" : "var(--text)"
+                  : "var(--border)",
+              }}>
+              {s === "all" ? "All" : s === "day" ? "☀️ Day" : "🌙 Night"}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Team cards */}
-      <div className="space-y-2.5 mb-4">
+      <div className="space-y-2.5 mb-2">
         {filteredTeam.map((member) => {
           const i = team.indexOf(member)
           const cfg = statusConfig[member.status]
@@ -239,36 +256,39 @@ export function TeamStatusPage() {
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>{member.name}</div>
-                  {member.shift && (
-                    <span className="text-[9px] font-bold px-1 py-0.5 rounded-full"
-                      style={{
-                        background: member.shift === "day" ? "var(--amber-light)" : member.shift === "night" ? "var(--accent-light)" : "var(--surface-alt)",
-                        color: member.shift === "day" ? "var(--amber)" : member.shift === "night" ? "var(--accent)" : "var(--text-muted)",
-                      }}>
-                      {member.shift === "day" ? "☀️" : member.shift === "night" ? "🌙" : "☀️🌙"}
-                    </span>
-                  )}
-                </div>
+                <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>{member.name}</div>
                 <div className="text-[11px] font-medium" style={{ color: cfg.color }}>{cfg.label}</div>
               </div>
-              <div className="flex gap-1">
-                {statusOrder.map((s) => (
-                  <div key={s} className="w-2 h-2 rounded-full transition-all duration-200"
-                    style={{
-                      background: member.status === s ? statusConfig[s].color : "var(--border)",
-                      opacity: member.status === s ? 1 : 0.4,
-                    }} />
-                ))}
-              </div>
+              {/* Shift badge — tappable to cycle */}
+              <button
+                onClick={(e) => cycleShift(i, e)}
+                className="flex-shrink-0 text-[10px] font-bold px-2 py-1 rounded-full cursor-pointer border transition-all active:scale-90"
+                style={{
+                  background: member.shift === "day" ? "var(--amber-light)"
+                    : member.shift === "night" ? "var(--accent-light)"
+                    : member.shift === "both" ? "var(--surface-alt)"
+                    : "var(--surface-alt)",
+                  color: member.shift === "day" ? "var(--amber)"
+                    : member.shift === "night" ? "var(--accent)"
+                    : member.shift === "both" ? "var(--text-secondary)"
+                    : "var(--border)",
+                  borderColor: member.shift === "day" ? "var(--amber)"
+                    : member.shift === "night" ? "var(--accent)"
+                    : member.shift === "both" ? "var(--border)"
+                    : "var(--border)",
+                }}>
+                {member.shift === "day" ? "☀️ Day"
+                  : member.shift === "night" ? "🌙 Night"
+                  : member.shift === "both" ? "☀️🌙"
+                  : "— shift"}
+              </button>
             </button>
           )
         })}
       </div>
 
       <div className="text-[11px] mb-6" style={{ color: "var(--text-muted)" }}>
-        Tap a card to cycle status
+        Tap card to cycle status · Tap shift badge to assign
       </div>
 
       {/* Lead goal progress */}
