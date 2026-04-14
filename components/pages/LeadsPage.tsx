@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Plus, Download, Copy, Trash2, Users, Flag, Trophy, Mail } from "lucide-react"
 import { useLeads } from "@/components/leads/useLeads"
 import { LeadForm } from "@/components/leads/LeadForm"
 import { LeadCard } from "@/components/leads/LeadCard"
 
-type FilterKey = "all" | "hot" | "warm" | "cool" | "followUp"
+const CAPTURED_BY_KEY = "sp_nra_captured_by"
+type FilterKey = "all" | "mine" | "hot" | "warm" | "cool" | "followUp"
 
 export function LeadsPage() {
   const { leads, stats, leaderboard, addLead, deleteLead, toggleFollowUp, clearAll, exportCSV, emailLeads, copyAll } = useLeads()
@@ -14,6 +15,12 @@ export function LeadsPage() {
   const [copyLabel, setCopyLabel] = useState("Copy All")
   const [filter, setFilter] = useState<FilterKey>("all")
   const [showLeaderboard, setShowLeaderboard] = useState(false)
+  const [myName, setMyName] = useState("")
+
+  useEffect(() => {
+    const saved = localStorage.getItem(CAPTURED_BY_KEY)
+    if (saved) setMyName(saved)
+  }, [])
 
   async function handleCopy() {
     const ok = await copyAll()
@@ -32,7 +39,10 @@ export function LeadsPage() {
     addLead(data)
   }
 
+  const myCount = leads.filter((l) => l.capturedBy === myName).length
+
   const filtered = leads.filter((l) => {
+    if (filter === "mine") return l.capturedBy === myName
     if (filter === "hot") return l.heat === "hot"
     if (filter === "warm") return l.heat === "warm"
     if (filter === "cool") return l.heat === "cool"
@@ -42,6 +52,7 @@ export function LeadsPage() {
 
   const filters: { key: FilterKey; label: string }[] = [
     { key: "all", label: `All (${stats.total})` },
+    ...(myName ? [{ key: "mine" as FilterKey, label: `Mine (${myCount})` }] : []),
     { key: "hot", label: `🔥 Hot (${stats.hot})` },
     { key: "warm", label: `☀️ Warm (${stats.warm})` },
     { key: "cool", label: `❄️ Cool (${stats.cool})` },
