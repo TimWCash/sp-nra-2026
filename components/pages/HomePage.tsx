@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { MapPin, Calendar, Clock, Building2, Store, Users, MessageCircle, ExternalLink, Wifi, Mic, UserPlus, Zap, Target, Trophy, ArrowRight, Camera, Plus } from "lucide-react"
+import { MapPin, Calendar, Clock, Building2, Store, Users, MessageCircle, ExternalLink, Wifi, Mic, UserPlus, Zap, Target, Trophy, ArrowRight, Camera, Plus, Minus, RotateCcw } from "lucide-react"
 import { useCountdown } from "@/hooks/useCountdown"
 import { team as teamMembers } from "@/lib/data"
 import { supabase } from "@/lib/supabase"
@@ -37,6 +37,26 @@ export function HomePage({ onNavigate }: HomePageProps) {
     setVisitorCount((c) => c + 1)
     await supabase.from("booth_traffic").insert({})
     setTimeout(() => setTapping(false), 200)
+  }
+
+  async function removeVisitor() {
+    if (visitorCount <= 0) return
+    setVisitorCount((c) => Math.max(0, c - 1))
+    const today = new Date().toISOString().split("T")[0]
+    const { data } = await supabase
+      .from("booth_traffic")
+      .select("id")
+      .gte("created_at", today + "T00:00:00")
+      .order("created_at", { ascending: false })
+      .limit(1)
+    if (data?.[0]) await supabase.from("booth_traffic").delete().eq("id", data[0].id)
+  }
+
+  async function resetVisitors() {
+    if (!confirm(`Reset booth visitor count to 0?`)) return
+    setVisitorCount(0)
+    const today = new Date().toISOString().split("T")[0]
+    await supabase.from("booth_traffic").delete().gte("created_at", today + "T00:00:00")
   }
 
   useEffect(() => {
@@ -223,10 +243,20 @@ export function HomePage({ onNavigate }: HomePageProps) {
         style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
         <div className="flex items-center justify-between mb-3">
           <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: "var(--text-muted)" }}>Booth Visitors Today</span>
-          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full" style={{ background: "var(--accent-light)", color: "var(--accent)" }}>Today</span>
+          <button onClick={resetVisitors}
+            className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-lg cursor-pointer border-0 active:scale-95 transition-all"
+            style={{ background: "var(--danger-light)", color: "var(--danger)" }}>
+            <RotateCcw size={10} /> Reset
+          </button>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <div className="text-[48px] font-extrabold tabular-nums leading-none" style={{ color: "var(--accent)" }}>{visitorCount}</div>
+          <button
+            onClick={removeVisitor}
+            className="w-12 h-12 flex items-center justify-center rounded-xl cursor-pointer transition-all duration-200 active:scale-[0.93] flex-shrink-0"
+            style={{ background: "var(--surface-alt)", border: "1px solid var(--border)", color: "var(--text-muted)" }}>
+            <Minus size={18} />
+          </button>
           <button
             onClick={addVisitor}
             className="flex-1 flex items-center justify-center gap-2 rounded-xl py-4 font-bold text-[16px] cursor-pointer transition-all duration-200 active:scale-[0.93]"
