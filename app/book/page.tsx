@@ -15,6 +15,14 @@ const morningSlots = ["10:00", "10:15", "10:30", "10:45", "11:00", "11:15", "11:
 const afternoonSlots = ["1:00", "1:15", "1:30", "1:45", "2:00", "2:15", "2:30", "2:45", "3:00", "3:15", "3:30", "3:45", "4:00", "4:15", "4:30"]
 const tuesdaySlots = ["1:00", "1:15", "1:30", "1:45", "2:00", "2:15", "2:30"]
 
+const totalSlotsPerDay: Record<string, number> = {
+  sat: morningSlots.length + afternoonSlots.length,   // 23
+  sun: morningSlots.length + afternoonSlots.length,   // 23
+  mon: morningSlots.length + afternoonSlots.length,   // 23
+  tue: morningSlots.length + tuesdaySlots.length,     // 15
+}
+const grandTotal = Object.values(totalSlotsPerDay).reduce((a, b) => a + b, 0) // 84
+
 function getSlotsForDay(dayKey: string) {
   return [...morningSlots, ...(dayKey === "tue" ? tuesdaySlots : afternoonSlots)]
 }
@@ -195,6 +203,15 @@ export default function BookPage() {
   // ── PICK SLOT ──
   const afternoonList = activeDay === "tue" ? tuesdaySlots : afternoonSlots
 
+  const bookedCount = bookings.length
+  const remaining = grandTotal - bookedCount
+  const pct = Math.round((bookedCount / grandTotal) * 100)
+
+  function dayRemaining(dayKey: string) {
+    const taken = bookings.filter((b) => b.day === dayKey).length
+    return totalSlotsPerDay[dayKey] - taken
+  }
+
   return (
     <div className="min-h-screen px-4 py-8 max-w-sm mx-auto" style={{ background: "#f8fafb" }}>
       {/* Header */}
@@ -203,23 +220,45 @@ export default function BookPage() {
         <span className="text-[12px] font-bold tracking-widest uppercase" style={{ color: "#008493" }}>Joy of Ops Podcast</span>
       </div>
       <h1 className="text-[22px] font-extrabold mb-1" style={{ color: "#1a2332" }}>Book a Podcast Slot</h1>
-      <p className="text-[14px] mb-6" style={{ color: "#64748b" }}>
+      <p className="text-[14px] mb-4" style={{ color: "#64748b" }}>
         NRA Show 2026 · Booth #7365 · McCormick Place · 15 min sessions
       </p>
 
-      {/* Day tabs */}
+      {/* Slots remaining counter */}
+      <div className="rounded-2xl p-4 mb-5" style={{ background: "#fff", border: "1.5px solid #e2e8f0" }}>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[13px] font-bold" style={{ color: "#1a2332" }}>
+            {remaining} of {grandTotal} slots available
+          </span>
+          <span className="text-[12px] font-bold px-2 py-0.5 rounded-full"
+            style={{ background: remaining < 20 ? "#fef3c7" : "#e6f7f8", color: remaining < 20 ? "#d97706" : "#008493" }}>
+            {pct}% booked
+          </span>
+        </div>
+        <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "#f1f5f9" }}>
+          <div className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${pct}%`, background: remaining < 20 ? "#f59e0b" : "#008493" }} />
+        </div>
+      </div>
+
+      {/* Day tabs with per-day remaining */}
       <div className="flex gap-2 mb-6">
-        {days.map((d) => (
-          <button key={d.key} onClick={() => setActiveDay(d.key)}
-            className="flex-1 rounded-xl py-2.5 text-[13px] font-bold cursor-pointer transition-all duration-200"
-            style={{
-              background: activeDay === d.key ? "#008493" : "#fff",
-              color: activeDay === d.key ? "#fff" : "#64748b",
-              border: activeDay === d.key ? "1.5px solid #008493" : "1.5px solid #e2e8f0",
-            }}>
-            {d.label}
-          </button>
-        ))}
+        {days.map((d) => {
+          const left = dayRemaining(d.key)
+          return (
+            <button key={d.key} onClick={() => setActiveDay(d.key)}
+              className="flex-1 rounded-xl py-2 text-center cursor-pointer transition-all duration-200"
+              style={{
+                background: activeDay === d.key ? "#008493" : "#fff",
+                border: activeDay === d.key ? "1.5px solid #008493" : "1.5px solid #e2e8f0",
+              }}>
+              <div className="text-[13px] font-bold" style={{ color: activeDay === d.key ? "#fff" : "#64748b" }}>{d.label}</div>
+              <div className="text-[10px] font-semibold mt-0.5" style={{ color: activeDay === d.key ? "rgba(255,255,255,0.75)" : "#94a3b8" }}>
+                {left} left
+              </div>
+            </button>
+          )
+        })}
       </div>
 
       {/* Morning */}
