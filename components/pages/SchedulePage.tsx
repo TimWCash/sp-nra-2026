@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Clock, AlertTriangle, CircleDot, Search, Map, GraduationCap, ChefHat, Wine, Lightbulb, Eye, Route, PartyPopper, ExternalLink, X, CalendarPlus, MapPin, Star, ChevronRight, Moon, Ticket } from "lucide-react"
+import { Clock, AlertTriangle, CircleDot, Search, Map, GraduationCap, ChefHat, Wine, Lightbulb, Eye, EyeOff, Route, PartyPopper, ExternalLink, X, CalendarPlus, MapPin, Star, ChevronRight, Moon, Ticket } from "lucide-react"
 import { schedule, dayTabs, afterHoursEvents, type AfterHoursEvent } from "@/lib/data"
 import { nraSessions, sessionCategories, type Session } from "@/lib/sessions"
 
@@ -187,6 +187,7 @@ function getDuration(timeStr: string): string {
 }
 
 const USER_STARS_KEY = "sp_user_starred_sessions"
+const HIDDEN_SESSIONS_KEY = "sp_hidden_sessions"
 
 function loadUserStars(): Set<string> {
   if (typeof window === "undefined") return new Set()
@@ -194,6 +195,14 @@ function loadUserStars(): Set<string> {
 }
 function saveUserStars(s: Set<string>) {
   localStorage.setItem(USER_STARS_KEY, JSON.stringify([...s]))
+}
+
+function loadHidden(): Set<string> {
+  if (typeof window === "undefined") return new Set()
+  try { return new Set(JSON.parse(localStorage.getItem(HIDDEN_SESSIONS_KEY) || "[]")) } catch { return new Set() }
+}
+function saveHidden(s: Set<string>) {
+  localStorage.setItem(HIDDEN_SESSIONS_KEY, JSON.stringify([...s]))
 }
 
 export function SchedulePage() {
@@ -205,8 +214,13 @@ export function SchedulePage() {
   const [selectedSession, setSelectedSession] = useState<{ session: Session; dayKey: string } | null>(null)
   const [calMenuOpen, setCalMenuOpen] = useState(false)
   const [userStars, setUserStars] = useState<Set<string>>(new Set())
+  const [hiddenSessions, setHiddenSessions] = useState<Set<string>>(new Set())
+  const [showHidden, setShowHidden] = useState(false)
 
-  useEffect(() => { setUserStars(loadUserStars()) }, [])
+  useEffect(() => {
+    setUserStars(loadUserStars())
+    setHiddenSessions(loadHidden())
+  }, [])
 
   function toggleStar(e: React.MouseEvent, sessionId: string) {
     e.stopPropagation()
@@ -216,13 +230,29 @@ export function SchedulePage() {
     saveUserStars(next)
   }
 
+  function toggleHide(e: React.MouseEvent, sessionId: string) {
+    e.stopPropagation()
+    const next = new Set(hiddenSessions)
+    next.has(sessionId) ? next.delete(sessionId) : next.add(sessionId)
+    setHiddenSessions(next)
+    saveHidden(next)
+  }
+
   const filteredSessions = (nraSessions[activeDay] || []).filter((s: Session) => {
+    // After-hours networking events belong on the 🌙 After Hours tab, not in NRA Sessions
+    if (s.category === "event") return false
+    // Per-user hidden list (toggle-able)
+    if (!showHidden && hiddenSessions.has(s.title)) return false
     if (filter === "spPick" && !s.spPick) return false
     if (filter === "myStars" && !userStars.has(s.title)) return false
     else if (filter !== "all" && filter !== "spPick" && filter !== "myStars" && s.category !== filter) return false
     if (search && !s.title.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
+
+  const hiddenCountToday = (nraSessions[activeDay] || []).filter(
+    (s: Session) => s.category !== "event" && hiddenSessions.has(s.title)
+  ).length
 
   const openDetail = (session: Session) => {
     setSelectedSession({ session, dayKey: activeDay })
@@ -394,17 +424,19 @@ export function SchedulePage() {
 
           {/* Category Filter */}
           <div className="flex gap-1.5 overflow-x-auto pb-1 mb-4 scrollbar-hide">
-            {sessionCategories.map((c) => (
-              <button key={c.key} onClick={() => setFilter(c.key)}
-                className="flex-shrink-0 py-1.5 px-3 rounded-full text-[11px] font-semibold cursor-pointer transition-all duration-200"
-                style={{
-                  background: filter === c.key ? "var(--accent)" : "var(--surface)",
-                  color: filter === c.key ? "var(--accent-fg)" : "var(--text-secondary)",
-                  border: `1px solid ${filter === c.key ? "var(--accent)" : "var(--border)"}`,
-                }}>
-                {c.label}
-              </button>
-            ))}
+            {sessionCategories
+              .filter((c) => c.key !== "event")
+              .map((c) => (
+                <button key={c.key} onClick={() => setFilter(c.key)}
+                  className="flex-shrink-0 py-1.5 px-3 rounded-full text-[11px] font-semibold cursor-pointer transition-all duration-200"
+                  style={{
+                    background: filter === c.key ? "var(--accent)" : "var(--surface)",
+                    color: filter === c.key ? "var(--accent-fg)" : "var(--text-secondary)",
+                    border: `1px solid ${filter === c.key ? "var(--accent)" : "var(--border)"}`,
+                  }}>
+                  {c.label}
+                </button>
+              ))}
             <button onClick={() => setFilter("myStars")}
               className="flex-shrink-0 py-1.5 px-3 rounded-full text-[11px] font-semibold cursor-pointer transition-all duration-200"
               style={{
@@ -414,6 +446,18 @@ export function SchedulePage() {
               }}>
               ☆ My Sessions{userStars.size > 0 ? ` (${userStars.size})` : ""}
             </button>
+            {hiddenCountToday > 0 && (
+              <button onClick={() => setShowHidden((v) => !v)}
+                className="flex-shrink-0 py-1.5 px-3 rounded-full text-[11px] font-semibold cursor-pointer transition-all duration-200 flex items-center gap-1"
+                style={{
+                  background: showHidden ? "var(--text-muted)" : "var(--surface)",
+                  color: showHidden ? "#fff" : "var(--text-secondary)",
+                  border: `1px solid ${showHidden ? "var(--text-muted)" : "var(--border)"}`,
+                }}>
+                {showHidden ? <Eye size={11} /> : <EyeOff size={11} />}
+                {showHidden ? "Hide hidden" : `Show hidden (${hiddenCountToday})`}
+              </button>
+            )}
           </div>
 
           {/* Count */}
@@ -425,11 +469,16 @@ export function SchedulePage() {
           <div className="space-y-2">
             {filteredSessions.map((session, i) => {
               const CatIcon = categoryIcons[session.category]
+              const isHidden = hiddenSessions.has(session.title)
               return (
                 <button key={i}
                   onClick={() => openDetail(session)}
                   className="w-full text-left rounded-xl p-3.5 transition-all duration-200 cursor-pointer active:scale-[0.98]"
-                  style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+                  style={{
+                    background: "var(--surface)",
+                    border: "1px solid var(--border)",
+                    opacity: isHidden ? 0.5 : 1,
+                  }}>
                   <div className="flex items-start gap-3">
                     {CatIcon && (
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
@@ -440,7 +489,7 @@ export function SchedulePage() {
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-[13px] leading-snug flex items-start gap-1.5" style={{ color: "var(--text)" }}>
                         {session.spPick && <span className="text-[12px] flex-shrink-0" title="SP Recommended">⭐</span>}
-                        <span>{session.title}</span>
+                        <span style={{ textDecoration: isHidden ? "line-through" : "none" }}>{session.title}</span>
                       </div>
                       <div className="text-[11px] mt-1 font-medium" style={{ color: "var(--accent)" }}>
                         {session.time}
@@ -460,6 +509,15 @@ export function SchedulePage() {
                           fill={userStars.has(session.title) ? "var(--amber)" : "none"}
                           style={{ color: userStars.has(session.title) ? "var(--amber)" : "var(--text-muted)", opacity: userStars.has(session.title) ? 1 : 0.4 }}
                         />
+                      </button>
+                      <button
+                        onClick={(e) => toggleHide(e, session.title)}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 active:scale-90"
+                        style={{ background: "transparent", border: "none" }}
+                        title={isHidden ? "Unhide this session" : "Hide this session"}>
+                        {isHidden
+                          ? <Eye size={15} style={{ color: "var(--text-muted)" }} />
+                          : <EyeOff size={15} style={{ color: "var(--text-muted)", opacity: 0.4 }} />}
                       </button>
                       <ChevronRight size={16} style={{ color: "var(--text-muted)", opacity: 0.5 }} />
                     </div>
