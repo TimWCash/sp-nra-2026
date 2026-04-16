@@ -1,11 +1,48 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Clock, AlertTriangle, CircleDot, Search, Map, GraduationCap, ChefHat, Wine, Lightbulb, Eye, Route, PartyPopper, ExternalLink, X, CalendarPlus, MapPin, Star, ChevronRight } from "lucide-react"
-import { schedule, dayTabs } from "@/lib/data"
+import { Clock, AlertTriangle, CircleDot, Search, Map, GraduationCap, ChefHat, Wine, Lightbulb, Eye, Route, PartyPopper, ExternalLink, X, CalendarPlus, MapPin, Star, ChevronRight, Moon, Ticket } from "lucide-react"
+import { schedule, dayTabs, afterHoursEvents, type AfterHoursEvent } from "@/lib/data"
 import { nraSessions, sessionCategories, type Session } from "@/lib/sessions"
 
-type ViewMode = "team" | "sessions"
+type ViewMode = "team" | "sessions" | "nights"
+
+const nightTabs = [
+  { key: "fri", label: "Fri 15", sub: "Pre-Show" },
+  { key: "sat", label: "Sat 16", sub: "" },
+  { key: "sun", label: "Sun 17", sub: "" },
+  { key: "mon", label: "Mon 18", sub: "" },
+  { key: "tue", label: "Tue 19", sub: "" },
+  { key: "any", label: "Spots", sub: "Any night" },
+]
+
+const typeEmoji: Record<string, string> = {
+  party: "🎉",
+  dinner: "🍽️",
+  awards: "🏆",
+  "happy-hour": "🍺",
+  bar: "🍸",
+  meetup: "🤝",
+  spot: "📍",
+}
+
+const accessLabel: Record<string, string> = {
+  free: "Free",
+  badge: "NRA Badge",
+  rsvp: "RSVP",
+  paid: "Paid",
+  operators: "Operators Only",
+  invite: "Invite Only",
+}
+
+const accessStyle: Record<string, { bg: string; color: string }> = {
+  free:      { bg: "var(--success-light, #e6f7f0)", color: "var(--success, #059669)" },
+  badge:     { bg: "var(--accent-light)", color: "var(--accent)" },
+  rsvp:      { bg: "var(--amber-light, #fef3c7)", color: "var(--amber, #d97706)" },
+  paid:      { bg: "var(--amber-light, #fef3c7)", color: "var(--amber, #d97706)" },
+  operators: { bg: "var(--accent-light)", color: "var(--accent)" },
+  invite:    { bg: "var(--surface-alt)", color: "var(--text-muted)" },
+}
 
 const totalSessions = Object.values(nraSessions).flat().length
 
@@ -161,6 +198,7 @@ function saveUserStars(s: Set<string>) {
 
 export function SchedulePage() {
   const [activeDay, setActiveDay] = useState("fri")
+  const [activeNight, setActiveNight] = useState("sat")
   const [view, setView] = useState<ViewMode>("team")
   const [filter, setFilter] = useState("all")
   const [search, setSearch] = useState("")
@@ -203,7 +241,7 @@ export function SchedulePage() {
       {/* View Toggle */}
       <div className="flex gap-1.5 mb-4 p-1 rounded-lg" style={{ background: "var(--surface-alt)" }}>
         <button onClick={() => setView("team")}
-          className="flex-1 py-2 rounded-md text-[13px] font-semibold cursor-pointer transition-all duration-200 text-center"
+          className="flex-1 py-2 rounded-md text-[12px] font-semibold cursor-pointer transition-all duration-200 text-center"
           style={{
             background: view === "team" ? "var(--surface)" : "transparent",
             color: view === "team" ? "var(--text)" : "var(--text-muted)",
@@ -213,14 +251,24 @@ export function SchedulePage() {
           Our Schedule
         </button>
         <button onClick={() => setView("sessions")}
-          className="flex-1 py-2 rounded-md text-[13px] font-semibold cursor-pointer transition-all duration-200 text-center"
+          className="flex-1 py-2 rounded-md text-[12px] font-semibold cursor-pointer transition-all duration-200 text-center"
           style={{
             background: view === "sessions" ? "var(--surface)" : "transparent",
             color: view === "sessions" ? "var(--text)" : "var(--text-muted)",
             boxShadow: view === "sessions" ? "var(--shadow-sm)" : "none",
             border: "none",
           }}>
-          NRA Sessions ({totalSessions})
+          NRA Sessions
+        </button>
+        <button onClick={() => setView("nights")}
+          className="flex-1 py-2 rounded-md text-[12px] font-semibold cursor-pointer transition-all duration-200 text-center"
+          style={{
+            background: view === "nights" ? "var(--surface)" : "transparent",
+            color: view === "nights" ? "var(--text)" : "var(--text-muted)",
+            boxShadow: view === "nights" ? "var(--shadow-sm)" : "none",
+            border: "none",
+          }}>
+          🌙 Nights
         </button>
       </div>
 
@@ -430,6 +478,77 @@ export function SchedulePage() {
         </>
       )}
 
+      {/* ── NIGHTS VIEW ── */}
+      {view === "nights" && (
+        <>
+          {/* Night tabs */}
+          <div className="flex gap-1.5 mb-5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            {nightTabs.map((t) => {
+              const count = afterHoursEvents.filter(e => e.night === t.key).length
+              return (
+                <button key={t.key} onClick={() => setActiveNight(t.key)}
+                  className="flex-shrink-0 flex flex-col items-center rounded-xl py-2 px-3 cursor-pointer transition-all duration-200"
+                  style={{
+                    background: activeNight === t.key ? "var(--accent)" : "var(--surface)",
+                    color: activeNight === t.key ? "var(--accent-fg)" : "var(--text-secondary)",
+                    border: `1px solid ${activeNight === t.key ? "var(--accent)" : "var(--border)"}`,
+                    minWidth: "3.5rem",
+                  }}>
+                  <span className="text-[12px] font-bold">{t.label}</span>
+                  {count > 0 && (
+                    <span className="text-[10px] font-semibold mt-0.5" style={{ opacity: activeNight === t.key ? 0.8 : 0.5 }}>
+                      {count} {t.key === "any" ? "" : "event" + (count !== 1 ? "s" : "")}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Event cards */}
+          {(() => {
+            const events = afterHoursEvents.filter(e => e.night === activeNight)
+            if (events.length === 0) {
+              return (
+                <div className="text-center py-16" style={{ color: "var(--text-muted)" }}>
+                  <Moon size={32} className="mx-auto mb-2 opacity-30" />
+                  <div className="text-sm">No events found for this night.</div>
+                </div>
+              )
+            }
+            // Separate spots from events
+            const spots = events.filter(e => e.type === "spot")
+            const nonSpots = events.filter(e => e.type !== "spot")
+            return (
+              <div className="space-y-5">
+                {nonSpots.length > 0 && (
+                  <div className="space-y-3">
+                    {activeNight === "any" && (
+                      <div className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: "var(--text-muted)" }}>
+                        Bar & Restaurant Spots
+                      </div>
+                    )}
+                    {nonSpots.map((ev: AfterHoursEvent) => (
+                      <NightEventCard key={ev.id} event={ev} />
+                    ))}
+                  </div>
+                )}
+                {spots.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="text-[11px] font-bold tracking-widest uppercase mt-2" style={{ color: "var(--text-muted)" }}>
+                      Worth Checking Out
+                    </div>
+                    {spots.map((ev: AfterHoursEvent) => (
+                      <NightEventCard key={ev.id} event={ev} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+        </>
+      )}
+
       {/* ── SESSION DETAIL MODAL ── */}
       {selectedSession && (
         <div className="fixed inset-0 z-[200] flex flex-col" style={{ background: "var(--bg)" }}>
@@ -579,6 +698,75 @@ export function SchedulePage() {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+function NightEventCard({ event }: { event: AfterHoursEvent }) {
+  const aStyle = accessStyle[event.access] || accessStyle.invite
+  const emoji = typeEmoji[event.type] || "🎟️"
+  const label = accessLabel[event.access] || event.access
+
+  return (
+    <div className="rounded-xl p-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+      {/* Top row: time + access badge */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <span className="text-base leading-none">{emoji}</span>
+          {event.time && (
+            <span className="text-[12px] font-semibold" style={{ color: "var(--accent)" }}>{event.time}</span>
+          )}
+        </div>
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
+          style={{ background: aStyle.bg, color: aStyle.color }}>
+          {label}
+        </span>
+      </div>
+
+      {/* Title */}
+      <div className="font-bold text-[14px] leading-snug mb-1" style={{ color: "var(--text)" }}>
+        {event.title}
+      </div>
+
+      {/* Host */}
+      {event.host && (
+        <div className="text-[12px] mb-1" style={{ color: "var(--text-muted)" }}>
+          {event.host}
+        </div>
+      )}
+
+      {/* Venue */}
+      <div className="flex items-start gap-1.5 mb-1">
+        <MapPin size={11} className="flex-shrink-0 mt-0.5" style={{ color: "var(--text-muted)" }} />
+        <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+          {event.venue}{event.address ? ` · ${event.address}` : ""}
+        </span>
+      </div>
+
+      {/* Cost */}
+      {event.cost && (
+        <div className="flex items-center gap-1.5 mb-2">
+          <Ticket size={11} className="flex-shrink-0" style={{ color: "var(--text-muted)" }} />
+          <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>{event.cost}</span>
+        </div>
+      )}
+
+      {/* Notes */}
+      {event.notes && (
+        <div className="text-[11px] mb-3 leading-relaxed" style={{ color: "var(--text-muted)" }}>
+          {event.notes}
+        </div>
+      )}
+
+      {/* Register / link button */}
+      {event.link && (
+        <a href={event.link} target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-[12px] font-bold px-3 py-2 rounded-lg no-underline transition-all duration-200 active:scale-[0.97]"
+          style={{ background: "var(--accent)", color: "var(--accent-fg)" }}>
+          <ExternalLink size={12} />
+          {event.access === "rsvp" ? "Register / RSVP" : event.access === "paid" ? "Buy Ticket" : event.access === "invite" ? "Learn More" : "View Event"}
+        </a>
       )}
     </div>
   )

@@ -22,6 +22,8 @@ export const schedule: Record<string, ScheduleEvent[]> = {
     { time: "12:00pm", title: "Submit Press Kit", sub: "Room S101b \u2014 bring physical copy or zip drive" },
     { time: "5:00pm", title: "Show Floor Closes", highlight: "close" },
     { time: "Evening", title: "Daily Debrief", sub: "Adjust for tomorrow. Log leads. Restock collateral." },
+    { time: "5:30pm", title: "🏆 IFMA Gold & Silver Plate Awards Gala", sub: "Chicago Union Station · 500 W Jackson Blvd · $695/person · The industry's Oscars night", link: { url: "https://www.ifmaworld.com/GSP", label: "Register" } },
+    { time: "Evening", title: "🎤 NRN MenuMasters Celebration", sub: "Morgan Manufacturing · 401 N Morgan St · Invite-only · Restaurant execs", link: { url: "https://menumastersevent.com/registration/", label: "Request Invite" } },
   ],
   sun: [
     { time: "9:00am", title: "Morning Team Meeting", sub: "Yesterday wins + adjustments for today" },
@@ -29,7 +31,11 @@ export const schedule: Record<string, ScheduleEvent[]> = {
     { time: "All Day", title: "Booth Staffing + Podcast", sub: "Track all conversations with lead retrieval app" },
     { time: "All Day", title: "Walk the show floor", sub: "Check out neighbors \u00b7 attend key sessions" },
     { time: "5:00pm", title: "Show Floor Closes", highlight: "close" },
-    { time: "Evening", title: "QSR Networking Party", sub: "Check QSR Networking Party page for details" },
+    { time: "4:00–7:00pm", title: "🍖 Flavor Forays BBQ & Cook-Off", sub: "Galleria Marchetti · 825 W Erie St · QSR/FSR Magazine co-host · ~1,000 chefs & operators", link: { url: "https://form.jotform.com/260204695689165", label: "Register" } },
+    { time: "5:00–7:00pm", title: "🥩 WTWH Spring Networking Party", sub: "Prime & Provisions · 222 N LaSalle St · QSR & FSR Magazine hosts · Open registration", link: { url: "https://web.cvent.com/event/884fe172-050b-4289-bf5a-8dc8a581c0bf/register", label: "Register" } },
+    { time: "5:00–7:00pm", title: "🎉 Young Professionals Networking Party", sub: "TAP @ Hyatt Regency McCormick · Under 35 · 21+ · $30/ticket", link: { url: "https://registration.experientevent.com/ShowNRA261/flow/ATT/", label: "Buy Ticket" } },
+    { time: "Evening", title: "🏟️ The Utility Show (Day 1)", sub: "Mae District · 19 E 21st St · Free shuttle from McCormick", link: { url: "https://utilityshow.com/", label: "Get Tickets" } },
+    { time: "7:00–10:00pm", title: "🍺 Buyers Edge Platform Afterparty", sub: "McCormick Place · Skee-ball, pop-a-shot, billiards · Free RSVP", link: { url: "https://nra.buyersedgeplatform.com/", label: "RSVP" } },
   ],
   mon: [
     { time: "9:00am", title: "Morning Team Meeting", sub: "Final push \u2014 biggest day" },
@@ -37,6 +43,9 @@ export const schedule: Record<string, ScheduleEvent[]> = {
     { time: "All Day", title: "Max floor time + social media", sub: "Post with #2026RestaurantShow \u00b7 tag prospects" },
     { time: "5:00pm", title: "Show Floor Closes", highlight: "close" },
     { time: "Evening", title: "Final debrief + prep for tomorrow", sub: "Tomorrow closes at 3pm. Plan load-out early." },
+    { time: "Evening", title: "🍺 RTN Annual Member Happy Hour", sub: "Fatpour Tap Works · Adjacent to McCormick · Free · Open to all", link: { url: "https://ensembleiq.swoogo.com/rtnhappyhour2026/begin", label: "Register" } },
+    { time: "Evening", title: "🎉 IFBTA & CHART Celebration of Technology", sub: "Zed451 Rooftop · Restaurant tech + training pros", link: { url: "https://ifbta.member365.com/public/event/details/ddaca4140ceaa64a152c2c3bba225475b9f37c03", label: "Register" } },
+    { time: "8:00–11:00pm", title: "🎸 Official Show After Party — House of Blues", sub: "329 N Dearborn St · Shift4 sponsor · Rod Tuffcurls & The Bench Press · Operators only · 21+", link: { url: "https://www.nationalrestaurantshow.com/home/show-after-party/", label: "Get Ticket" } },
   ],
   tue: [
     { time: "9:00am", title: "Morning Meeting", sub: "Final day \u2014 confirm load-out logistics" },
@@ -58,7 +67,7 @@ export const dayTabs = [
 // ── AFTER HOURS EVENTS ──
 export interface AfterHoursEvent {
   id: string
-  night: "sat" | "sun" | "mon" | "tue" | "any"
+  night: "fri" | "sat" | "sun" | "mon" | "tue" | "any"
   time?: string
   title: string
   host?: string
@@ -76,7 +85,7 @@ export const afterHoursEvents: AfterHoursEvent[] = [
   // ── FRIDAY MAY 15 ──
   {
     id: "fri-prosper",
-    night: "sat", // shown under Fri which maps to "pre-show" — using sat as placeholder, handled in UI
+    night: "fri",
     time: "4:00 PM – 6:00 PM",
     title: "Prosper Accelerator Welcome Mixer",
     host: "Prosper Accelerator",
@@ -394,6 +403,51 @@ export const afterHoursEvents: AfterHoursEvent[] = [
     type: "spot",
     confirmed: true,
   },
+  {
+    id: "sun-wtwh",
+    night: "sun",
+    time: "5:00 PM – 7:00 PM",
+    title: "WTWH Spring Networking Party",
+    host: "WTWH Media (QSR Magazine & FSR Magazine)",
+    venue: "Prime & Provisions Steakhouse",
+    address: "222 N LaSalle St, Chicago, IL 60601",
+    cost: "Free (open registration)",
+    access: "rsvp",
+    link: "https://web.cvent.com/event/884fe172-050b-4289-bf5a-8dc8a581c0bf/register",
+    notes: "Annual NRA week networking party hosted by the publishers of QSR and FSR magazines. Starts right as the show floor closes.",
+    type: "happy-hour",
+    confirmed: true,
+  },
+  {
+    id: "sun-flavorforays",
+    night: "sun",
+    time: "4:00 PM – 7:00 PM",
+    title: "Flavor Forays Annual Championship BBQ & Cook-Off",
+    host: "Flavor Forays (Barbara Mathias & Beverly Stephen)",
+    venue: "Galleria Marchetti",
+    address: "825 W. Erie St., Chicago",
+    cost: "Ticketed",
+    access: "rsvp",
+    link: "https://form.jotform.com/260204695689165",
+    notes: "The industry's must-attend BBQ. Up to 1,000 of the industry's leading chefs and operators. Benefits World Central Kitchen and the Greater Chicago Food Depository.",
+    type: "party",
+    confirmed: true,
+  },
+  {
+    id: "mon-rtn",
+    night: "mon",
+    time: "Evening",
+    title: "RTN Annual Member Happy Hour",
+    host: "Restaurant Technology Network",
+    venue: "Fatpour Tap Works",
+    address: "2206 S Indiana Ave (adjacent to McCormick Place)",
+    cost: "Free",
+    access: "rsvp",
+    link: "https://ensembleiq.swoogo.com/rtnhappyhour2026/begin",
+    notes: "Open to RTN members and non-members. RTN co-founder Abby Lorden presents 2026 roadmap. 'Come as you are.' The tech crowd's Monday night gathering.",
+    type: "happy-hour",
+    confirmed: true,
+  },
 ]
 
 // ── TEAM ──
@@ -403,6 +457,7 @@ export interface TeamMember {
   photo?: string
   shift?: "day" | "night" | "both"
   flights?: { label: string; detail: string }[]
+  accommodation?: string
   notes?: string[]
   linkedin?: string
 }
@@ -416,7 +471,7 @@ export const team: TeamMember[] = [
       { label: "✈️ SYR → ORD", detail: "May 15 · 10:36am · UA5964 Seat 7B" },
       { label: "✈️ ORD → SYR", detail: "May 20 · 10:35am" },
     ],
-    notes: ["🏠 Airbnb"],
+    accommodation: "🏠 Airbnb — Pilsen Home",
     linkedin: "https://www.linkedin.com/in/reece-brian/",
   },
   {
@@ -427,6 +482,7 @@ export const team: TeamMember[] = [
       { label: "✈️ DFW → ORD", detail: "May 15 · 7:00am · AA1120 · Arrives 9:27am" },
       { label: "✈️ ORD → DFW", detail: "May 20 · 8:15am · AA481 · Arrives 10:53am" },
     ],
+    accommodation: "🏨 Hilton Garden Inn Chicago Downtown/Magnificent Mile",
   },
   {
     name: "Maria",
@@ -436,13 +492,14 @@ export const team: TeamMember[] = [
       { label: "✈️ EZE → ORD", detail: "May 14 · 9:00am" },
       { label: "✈️ ORD → EZE", detail: "May 20 · 2:40pm" },
     ],
-    notes: ["🏠 Airbnb"],
+    accommodation: "🏨 Hilton Garden Inn Chicago Downtown/Magnificent Mile",
   },
   {
     name: "Steve",
     initials: "S",
     photo: "/team/steve.jpg",
-    notes: ["🚗 Driving to Chicago", "🏠 Airbnb"],
+    accommodation: "🏠 Airbnb — Pilsen Home",
+    notes: ["🚗 Driving to Chicago"],
     linkedin: "https://www.linkedin.com/in/steve-crowley-445b507/",
   },
   {
@@ -453,6 +510,7 @@ export const team: TeamMember[] = [
       { label: "✈️ DFW → ORD", detail: "May 15 · 9:30am" },
       { label: "✈️ ORD → DFW", detail: "May 19 · 8:35pm" },
     ],
+    accommodation: "🏨 Hilton Garden Inn Chicago Downtown/Magnificent Mile",
   },
   {
     name: "Emily",

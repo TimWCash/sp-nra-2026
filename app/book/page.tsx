@@ -11,17 +11,17 @@ const days = [
   { key: "tue", label: "Tue", full: "Tuesday, May 19" },
 ]
 
-const morningSlots = ["10:00", "10:15", "10:30", "10:45", "11:00", "11:15", "11:30", "11:45"]
-const afternoonSlots = ["1:00", "1:15", "1:30", "1:45", "2:00", "2:15", "2:30", "2:45", "3:00", "3:15", "3:30", "3:45", "4:00", "4:15", "4:30"]
-const tuesdaySlots = ["1:00", "1:15", "1:30", "1:45", "2:00", "2:15", "2:30"]
+const morningSlots = ["10:00", "10:30", "11:00", "11:30"]
+const afternoonSlots = ["1:00", "1:30", "2:00", "2:30", "3:00", "3:30", "4:00", "4:30"]
+const tuesdaySlots = ["1:00", "1:30", "2:00", "2:30"]
 
 const totalSlotsPerDay: Record<string, number> = {
-  sat: morningSlots.length + afternoonSlots.length,   // 23
-  sun: morningSlots.length + afternoonSlots.length,   // 23
-  mon: morningSlots.length + afternoonSlots.length,   // 23
-  tue: morningSlots.length + tuesdaySlots.length,     // 15
+  sat: morningSlots.length + afternoonSlots.length,   // 12
+  sun: morningSlots.length + afternoonSlots.length,   // 12
+  mon: morningSlots.length + afternoonSlots.length,   // 12
+  tue: morningSlots.length + tuesdaySlots.length,     // 8
 }
-const grandTotal = Object.values(totalSlotsPerDay).reduce((a, b) => a + b, 0) // 84
+const grandTotal = Object.values(totalSlotsPerDay).reduce((a, b) => a + b, 0) // 44
 
 function getSlotsForDay(dayKey: string) {
   return [...morningSlots, ...(dayKey === "tue" ? tuesdaySlots : afternoonSlots)]
@@ -126,7 +126,7 @@ export default function BookPage() {
           <div className="rounded-2xl p-4 text-left mb-6" style={{ background: "#fff", border: "1.5px solid #e2e8f0" }}>
             <div className="text-[12px] font-bold tracking-widest uppercase mb-3" style={{ color: "#94a3b8" }}>What to expect</div>
             <div className="space-y-2 text-[13px]" style={{ color: "#475569" }}>
-              <p>🎙️ 15-minute recorded conversation at our booth</p>
+              <p>🎙️ 30-minute recorded conversation at our booth</p>
               <p>📍 Swing by Booth #7365 right at your time slot</p>
               <p>🎧 Joy of Ops is a podcast for restaurant operators</p>
             </div>
@@ -159,7 +159,7 @@ export default function BookPage() {
         </div>
         <h1 className="text-[22px] font-extrabold mb-1" style={{ color: "#1a2332" }}>Almost there</h1>
         <p className="text-[14px] mb-6" style={{ color: "#64748b" }}>
-          {dayLabel} · {selectedTime} · 15 min · Booth #7365
+          {dayLabel} · {selectedTime} · 30 min · Booth #7365
         </p>
 
         <div className="space-y-3 mb-6">
@@ -221,7 +221,7 @@ export default function BookPage() {
       </div>
       <h1 className="text-[22px] font-extrabold mb-1" style={{ color: "#1a2332" }}>Book a Podcast Slot</h1>
       <p className="text-[14px] mb-4" style={{ color: "#64748b" }}>
-        NRA Show 2026 · Booth #7365 · McCormick Place · 15 min sessions
+        NRA Show 2026 · Booth #7365 · McCormick Place · 30 min sessions
       </p>
 
       {/* Slots remaining counter */}

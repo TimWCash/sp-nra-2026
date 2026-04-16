@@ -1,12 +1,32 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { MapPin, Calendar, Clock, Building2, Store, Users, MessageCircle, ExternalLink, Wifi, Mic, UserPlus, Zap, Target, Trophy, ArrowRight, Camera, Plus, Minus, RotateCcw } from "lucide-react"
+import { MapPin, Calendar, Clock, Building2, Store, Users, MessageCircle, ExternalLink, Wifi, Mic, UserPlus, Zap, Target, Trophy, ArrowRight, Camera, Plus, Minus, RotateCcw, ChevronDown, Plane, Hotel, House, Car, StickyNote, Activity, PackageOpen, PackageCheck } from "lucide-react"
 import { useCountdown } from "@/hooks/useCountdown"
 import { team as teamMembers } from "@/lib/data"
 import { supabase } from "@/lib/supabase"
 
 import type { PageId } from "@/components/layout/BottomNav"
+
+const FLIGHTS_KEY = "sp_flight_overrides"
+const ACCOMMODATION_KEY = "sp_accommodation_overrides"
+
+interface FlightEntry { label: string; detail: string }
+
+function readLocal<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback
+  try { return JSON.parse(localStorage.getItem(key) || "null") ?? fallback } catch { return fallback }
+}
+
+const TOP_TILES: { page: PageId; Icon: typeof Users; label: string; sub: string; anchor?: string }[] = [
+  { page: "more", Icon: StickyNote, label: "Team Notes", sub: "Shared scratchpad", anchor: "notes" },
+  { page: "team", Icon: Users, label: "Team Travel", sub: "Flights & hotels" },
+  { page: "talk", Icon: MessageCircle, label: "Podcast Talking Points", sub: "What to say" },
+  { page: "status", Icon: Activity, label: "Team Status", sub: "Who's where" },
+  { page: "loadin", Icon: PackageOpen, label: "Load In", sub: "Marshalling & setup", anchor: "loadin" },
+  { page: "loadin", Icon: PackageCheck, label: "Load Out", sub: "Teardown", anchor: "loadout" },
+  { page: "photos", Icon: Camera, label: "Show Photos", sub: "Team album" },
+]
 
 const BAT_SIGNAL_KEY = "sp_bat_signal"
 
@@ -20,6 +40,19 @@ export function HomePage({ onNavigate }: HomePageProps) {
   const [pulse, setPulse] = useState(false)
   const [visitorCount, setVisitorCount] = useState(0)
   const [tapping, setTapping] = useState(false)
+  const [travelOpen, setTravelOpen] = useState(false)
+  const [flightOverrides, setFlightOverrides] = useState<Record<string, FlightEntry[]>>({})
+  const [accommodationOverrides, setAccommodationOverrides] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    setFlightOverrides(readLocal(FLIGHTS_KEY, {}))
+    setAccommodationOverrides(readLocal(ACCOMMODATION_KEY, {}))
+  }, [])
+
+  function handleTileClick(page: PageId, anchor?: string) {
+    if (anchor && typeof window !== "undefined") window.location.hash = anchor
+    onNavigate?.(page)
+  }
 
   const fetchVisitors = useCallback(async () => {
     const today = new Date().toISOString().split("T")[0]
@@ -105,6 +138,103 @@ export function HomePage({ onNavigate }: HomePageProps) {
           <ArrowRight size={18} color="white" />
         </button>
       )}
+
+      {/* Top Quick Nav — pinned at the very top */}
+      <div className="space-y-1.5 mb-4">
+        {TOP_TILES.map((item, i) => (
+          <button key={`${item.page}-${i}`} onClick={() => handleTileClick(item.page, item.anchor)}
+            className="w-full flex items-center gap-3 rounded-xl p-3.5 text-left cursor-pointer transition-all duration-200 active:scale-[0.98]"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: "var(--accent-light)" }}>
+              <item.Icon size={16} style={{ color: "var(--accent)" }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>{item.label}</div>
+              <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>{item.sub}</div>
+            </div>
+            <ArrowRight size={14} style={{ color: "var(--text-muted)", opacity: 0.5 }} />
+          </button>
+        ))}
+      </div>
+
+      {/* Travel + Hotel Dropdown */}
+      <div className="rounded-xl mb-5 overflow-hidden"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
+        <button onClick={() => setTravelOpen((v) => !v)}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 cursor-pointer bg-transparent border-0 text-left">
+          <div className="flex items-center gap-2.5">
+            <Plane size={15} style={{ color: "var(--accent)" }} />
+            <span className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>Everyone's Travel & Hotel</span>
+          </div>
+          <ChevronDown size={15} className="transition-transform duration-200"
+            style={{ color: "var(--text-muted)", transform: travelOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
+        </button>
+        {travelOpen && (
+          <div style={{ borderTop: "1px solid var(--border)" }}>
+            {teamMembers.map((person, idx) => {
+              const flights: FlightEntry[] = flightOverrides[person.name] ?? person.flights ?? []
+              const accommodation = person.name in accommodationOverrides
+                ? accommodationOverrides[person.name]
+                : person.accommodation ?? ""
+              const notes = person.notes ?? []
+              const hasAny = flights.length > 0 || accommodation || notes.length > 0
+              return (
+                <div key={person.name} className="px-4 py-3"
+                  style={{ borderBottom: idx < teamMembers.length - 1 ? "1px solid var(--border)" : "none" }}>
+                  <div className="flex items-center gap-2.5 mb-1.5">
+                    {person.photo ? (
+                      <img src={person.photo} alt={person.name}
+                        className="w-7 h-7 rounded-full object-cover"
+                        style={{ border: "1.5px solid var(--border)" }} />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold"
+                        style={{ background: "var(--accent-light)", color: "var(--accent)", border: "1.5px solid var(--accent)" }}>
+                        {person.initials}
+                      </div>
+                    )}
+                    <span className="text-[13px] font-bold" style={{ color: "var(--text)" }}>{person.name}</span>
+                  </div>
+                  {!hasAny && (
+                    <div className="text-[11px] ml-[38px]" style={{ color: "var(--text-muted)" }}>No travel logged yet</div>
+                  )}
+                  <div className="ml-[38px] space-y-1">
+                    {flights.map((f, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--text-secondary)" }}>
+                        <Plane size={11} className="flex-shrink-0" style={{ color: "var(--accent)" }} />
+                        <span className="font-medium">{f.label}</span>
+                        <span style={{ color: "var(--text-muted)" }}>·</span>
+                        <span>{f.detail}</span>
+                      </div>
+                    ))}
+                    {accommodation && (
+                      <div className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--text-secondary)" }}>
+                        {/airbnb|house|home/i.test(accommodation)
+                          ? <House size={11} className="flex-shrink-0" style={{ color: "var(--accent)" }} />
+                          : <Hotel size={11} className="flex-shrink-0" style={{ color: "var(--accent)" }} />}
+                        <span>{accommodation}</span>
+                      </div>
+                    )}
+                    {notes.map((n, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
+                        {n.includes("Driving")
+                          ? <Car size={11} className="flex-shrink-0" style={{ color: "var(--text-muted)" }} />
+                          : <StickyNote size={11} className="flex-shrink-0" style={{ color: "var(--text-muted)" }} />}
+                        <span>{n}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+            <button onClick={() => onNavigate?.("team")}
+              className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-[12px] font-semibold cursor-pointer bg-transparent border-0"
+              style={{ background: "var(--surface-alt)", color: "var(--accent)", borderTop: "1px solid var(--border)" }}>
+              Edit my flights / hotel <ArrowRight size={12} />
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Hero */}
       <div className="mb-5">

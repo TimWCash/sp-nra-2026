@@ -21,9 +21,9 @@ const days = [
   { key: "tue", label: "Tue May 19" },
 ]
 
-const morningSlots = ["10:00", "10:15", "10:30", "10:45", "11:00", "11:15", "11:30", "11:45"]
-const afternoonSlots = ["1:00", "1:15", "1:30", "1:45", "2:00", "2:15", "2:30", "2:45", "3:00", "3:15", "3:30", "3:45", "4:00", "4:15", "4:30"]
-const tuesdayAfternoonSlots = ["1:00", "1:15", "1:30", "1:45", "2:00", "2:15", "2:30"]
+const morningSlots = ["10:00", "10:30", "11:00", "11:30"]
+const afternoonSlots = ["1:00", "1:30", "2:00", "2:30", "3:00", "3:30", "4:00", "4:30"]
+const tuesdayAfternoonSlots = ["1:00", "1:30", "2:00", "2:30"]
 
 function getSlotsForDay(dayKey: string) {
   return [...morningSlots, ...(dayKey === "tue" ? tuesdayAfternoonSlots : afternoonSlots)]
@@ -187,7 +187,7 @@ export function PodcastPage() {
               </button>
             </div>
             <p className="text-[13px] mb-4" style={{ color: "var(--text-muted)" }}>
-              {days.find((d) => d.key === activeDay)?.label} at {formTime} &middot; 15 min session
+              {days.find((d) => d.key === activeDay)?.label} at {formTime} &middot; 30 min session
             </p>
 
             <input className={`${inputCls} ${nameError ? "ring-2 ring-[var(--danger)]" : ""}`}

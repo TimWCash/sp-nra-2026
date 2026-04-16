@@ -1,12 +1,10 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Copy, Mail, Users, MessageCircle, Mic, Activity, Truck, ChevronRight, HelpCircle, ChevronDown, StickyNote, Camera } from "lucide-react"
+import { Copy, Mail, Users, MessageCircle, Activity, Truck, ChevronRight, HelpCircle, ChevronDown, StickyNote, Camera, PackageOpen, PackageCheck } from "lucide-react"
 import { keyDates, emailTemplate } from "@/lib/data"
 import { supabase } from "@/lib/supabase"
 import type { PageId } from "@/components/layout/BottomNav"
-
-const TEAM_MEMBERS = ["Brian", "Rebecca", "Maria", "Steve", "Kelly", "Emily", "Ellis"] as const
 
 const badgeVariant: Record<string, string> = {
   teal: "bg-sp-accent-light text-sp-accent",
@@ -70,6 +68,17 @@ const HOW_TO: { q: string; a: string }[] = [
   },
 ]
 
+// Shared quick-nav tiles used at the top of More (and also on Home)
+export const TOP_NAV_TILES: { page: PageId; Icon: typeof Users; label: string; sub: string; anchor?: string }[] = [
+  { page: "more" as PageId, Icon: StickyNote, label: "Team Notes", sub: "Shared scratchpad", anchor: "notes" },
+  { page: "team" as PageId, Icon: Users, label: "Team Travel", sub: "Flights & hotels" },
+  { page: "talk" as PageId, Icon: MessageCircle, label: "Podcast Talking Points", sub: "What to say" },
+  { page: "status" as PageId, Icon: Activity, label: "Team Status", sub: "Who's where" },
+  { page: "loadin" as PageId, Icon: PackageOpen, label: "Load In", sub: "Marshalling & setup", anchor: "loadin" },
+  { page: "loadin" as PageId, Icon: PackageCheck, label: "Load Out", sub: "Teardown", anchor: "loadout" },
+  { page: "photos" as PageId, Icon: Camera, label: "Show Photos", sub: "Team album" },
+]
+
 export function MorePage({ onNavigate }: MorePageProps) {
   const [copyLabel, setCopyLabel] = useState("Copy to clipboard")
   const [openIndex, setOpenIndex] = useState<number | null>(null)
@@ -83,6 +92,16 @@ export function MorePage({ onNavigate }: MorePageProps) {
     if (saved) setNotesBy(saved)
     supabase.from("team_notes").select("content").eq("id", 1).single()
       .then(({ data }) => { if (data) setNotes(data.content || "") })
+  }, [])
+
+  // Scroll to an anchor if we land here via a tile with anchor
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const hash = window.location.hash.replace("#", "")
+    if (hash) {
+      const el = document.getElementById(hash)
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
   }, [])
 
   function handleNotesChange(val: string) {
@@ -102,39 +121,47 @@ export function MorePage({ onNavigate }: MorePageProps) {
     })
   }
 
+  function handleTileClick(page: PageId, anchor?: string) {
+    if (anchor) {
+      if (page === "more") {
+        // same page — just scroll
+        const el = document.getElementById(anchor)
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
+        return
+      }
+      // different page — include anchor in hash so that page can scroll
+      if (typeof window !== "undefined") window.location.hash = anchor
+    }
+    onNavigate?.(page)
+  }
+
   return (
     <div className="animate-fade-in">
       <h1 className="text-xl font-bold mb-4" style={{ color: "var(--text)" }}>More</h1>
 
-      {/* How To Use */}
-      <SectionLabel>How to Use This App</SectionLabel>
-      <div className="rounded-xl overflow-hidden mb-6"
-        style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
-        {HOW_TO.map((item, i) => (
-          <div key={i} style={{ borderBottom: i < HOW_TO.length - 1 ? "1px solid var(--border)" : "none" }}>
-            <button
-              onClick={() => setOpenIndex(openIndex === i ? null : i)}
-              className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left cursor-pointer bg-transparent border-0"
-            >
-              <div className="flex items-center gap-2.5">
-                <HelpCircle size={14} className="flex-shrink-0" style={{ color: "var(--accent)" }} />
-                <span className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>{item.q}</span>
-              </div>
-              <ChevronDown size={14} className="flex-shrink-0 transition-transform duration-200"
-                style={{ color: "var(--text-muted)", transform: openIndex === i ? "rotate(180deg)" : "rotate(0deg)" }} />
-            </button>
-            {openIndex === i && (
-              <div className="px-4 pb-4 text-[13px] leading-relaxed"
-                style={{ color: "var(--text-secondary)" }}>
-                {item.a}
-              </div>
-            )}
-          </div>
+      {/* Quick Nav */}
+      <div className="space-y-1.5 mb-6">
+        {TOP_NAV_TILES.map((item, i) => (
+          <button key={`${item.page}-${i}`} onClick={() => handleTileClick(item.page, item.anchor)}
+            className="w-full flex items-center gap-3 rounded-xl p-3.5 text-left cursor-pointer transition-all duration-200 active:scale-[0.98]"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: "var(--accent-light)" }}>
+              <item.Icon size={16} style={{ color: "var(--accent)" }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>{item.label}</div>
+              <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>{item.sub}</div>
+            </div>
+            <ChevronRight size={16} style={{ color: "var(--text-muted)", opacity: 0.5 }} />
+          </button>
         ))}
       </div>
 
       {/* Shared Notes */}
-      <SectionLabel>Team Notes</SectionLabel>
+      <div id="notes">
+        <SectionLabel>Team Notes</SectionLabel>
+      </div>
       <div className="rounded-xl overflow-hidden mb-6" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
         <div className="flex items-center justify-between px-4 pt-3 pb-2">
           <div className="flex items-center gap-1.5">
@@ -151,32 +178,6 @@ export function MorePage({ onNavigate }: MorePageProps) {
           className="w-full px-4 pb-4 text-[13px] leading-relaxed resize-none outline-none bg-transparent"
           style={{ color: "var(--text)", minHeight: "120px", border: "none" }}
         />
-      </div>
-
-      {/* Quick Nav */}
-      <div className="space-y-1.5 mb-6">
-        {[
-          { page: "photos" as PageId, Icon: Camera, label: "Show Photos", sub: "Shared team album" },
-          { page: "team" as PageId, Icon: Users, label: "Team", sub: "Travel & contacts" },
-          { page: "talk" as PageId, Icon: MessageCircle, label: "Talking Points", sub: "At the booth" },
-          { page: "podcast" as PageId, Icon: Mic, label: "Podcast", sub: "Joy of Ops schedule" },
-          { page: "status" as PageId, Icon: Activity, label: "Team Status", sub: "Who's where" },
-          { page: "loadin" as PageId, Icon: Truck, label: "Load In / Out", sub: "Marshalling & teardown" },
-        ].map((item) => (
-          <button key={item.page} onClick={() => onNavigate?.(item.page)}
-            className="w-full flex items-center gap-3 rounded-xl p-3.5 text-left cursor-pointer transition-all duration-200 active:scale-[0.98]"
-            style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: "var(--accent-light)" }}>
-              <item.Icon size={16} style={{ color: "var(--accent)" }} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>{item.label}</div>
-              <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>{item.sub}</div>
-            </div>
-            <ChevronRight size={16} style={{ color: "var(--text-muted)", opacity: 0.5 }} />
-          </button>
-        ))}
       </div>
 
       {/* Key Dates */}
@@ -204,10 +205,37 @@ export function MorePage({ onNavigate }: MorePageProps) {
         {emailTemplate}
       </div>
       <button onClick={copyEmail}
-        className="w-full rounded-lg py-2.5 text-[13px] font-semibold cursor-pointer transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-[0.98]"
+        className="w-full rounded-lg py-2.5 text-[13px] font-semibold cursor-pointer transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-[0.98] mb-6"
         style={{ background: "var(--surface-alt)", border: "1px solid var(--border)", color: "var(--text)" }}>
         <Copy size={14} /> {copyLabel}
       </button>
+
+      {/* How To Use (moved to the very bottom) */}
+      <SectionLabel>How to Use This App</SectionLabel>
+      <div className="rounded-xl overflow-hidden mb-6"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
+        {HOW_TO.map((item, i) => (
+          <div key={i} style={{ borderBottom: i < HOW_TO.length - 1 ? "1px solid var(--border)" : "none" }}>
+            <button
+              onClick={() => setOpenIndex(openIndex === i ? null : i)}
+              className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left cursor-pointer bg-transparent border-0"
+            >
+              <div className="flex items-center gap-2.5">
+                <HelpCircle size={14} className="flex-shrink-0" style={{ color: "var(--accent)" }} />
+                <span className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>{item.q}</span>
+              </div>
+              <ChevronDown size={14} className="flex-shrink-0 transition-transform duration-200"
+                style={{ color: "var(--text-muted)", transform: openIndex === i ? "rotate(180deg)" : "rotate(0deg)" }} />
+            </button>
+            {openIndex === i && (
+              <div className="px-4 pb-4 text-[13px] leading-relaxed"
+                style={{ color: "var(--text-secondary)" }}>
+                {item.a}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
