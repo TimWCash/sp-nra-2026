@@ -198,7 +198,7 @@ export const afterHoursEvents: AfterHoursEvent[] = [
     venue: "McCormick Place Convention Center",
     cost: "Free (RSVP required)",
     access: "rsvp",
-    link: "https://nra.buyersedgeplatform.com/",
+    link: "https://web.cvent.com/event/c86fcd74-2dbe-40ad-b5af-75c1d3c8fa29/register",
     notes: "Cocktails + games (skee-ball, pop-a-shot, billiards, shuffleboard). Annual event, consistently fun.",
     type: "party",
     confirmed: true,
