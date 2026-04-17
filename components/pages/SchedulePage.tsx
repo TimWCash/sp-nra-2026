@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Clock, AlertTriangle, CircleDot, Search, Map, GraduationCap, ChefHat, Wine, Lightbulb, Eye, EyeOff, Route, PartyPopper, ExternalLink, X, CalendarPlus, MapPin, Star, ChevronRight, Moon, Ticket } from "lucide-react"
 import { schedule, dayTabs, afterHoursEvents, type AfterHoursEvent } from "@/lib/data"
 import { nraSessions, sessionCategories, type Session } from "@/lib/sessions"
+import { supabase } from "@/lib/supabase"
 
 type ViewMode = "team" | "sessions" | "nights"
 
@@ -216,11 +217,47 @@ export function SchedulePage() {
   const [userStars, setUserStars] = useState<Set<string>>(new Set())
   const [hiddenSessions, setHiddenSessions] = useState<Set<string>>(new Set())
   const [showHidden, setShowHidden] = useState(false)
+  const [hiddenAfterHours, setHiddenAfterHours] = useState<Set<string>>(new Set())
+  const [showHiddenAfterHours, setShowHiddenAfterHours] = useState(false)
 
   useEffect(() => {
     setUserStars(loadUserStars())
     setHiddenSessions(loadHidden())
   }, [])
+
+  // Load + subscribe to team-wide hidden after-hours events (syncs across devices)
+  useEffect(() => {
+    let cancelled = false
+    supabase.from("hidden_after_hours_events").select("event_id").then(({ data }) => {
+      if (cancelled || !data) return
+      setHiddenAfterHours(new Set(data.map((r) => r.event_id)))
+    })
+    const channel = supabase
+      .channel("hidden-after-hours")
+      .on("postgres_changes", { event: "*", schema: "public", table: "hidden_after_hours_events" },
+        (payload) => {
+          setHiddenAfterHours((prev) => {
+            const next = new Set(prev)
+            if (payload.eventType === "INSERT" && payload.new) next.add((payload.new as { event_id: string }).event_id)
+            if (payload.eventType === "DELETE" && payload.old) next.delete((payload.old as { event_id: string }).event_id)
+            return next
+          })
+        })
+      .subscribe()
+    return () => { cancelled = true; supabase.removeChannel(channel) }
+  }, [])
+
+  async function toggleHideAfterHours(eventId: string) {
+    if (hiddenAfterHours.has(eventId)) {
+      // Optimistic remove
+      setHiddenAfterHours((prev) => { const n = new Set(prev); n.delete(eventId); return n })
+      await supabase.from("hidden_after_hours_events").delete().eq("event_id", eventId)
+    } else {
+      // Optimistic add
+      setHiddenAfterHours((prev) => new Set(prev).add(eventId))
+      await supabase.from("hidden_after_hours_events").upsert({ event_id: eventId }, { onConflict: "event_id" })
+    }
+  }
 
   function toggleStar(e: React.MouseEvent, sessionId: string) {
     e.stopPropagation()
@@ -298,7 +335,7 @@ export function SchedulePage() {
             boxShadow: view === "nights" ? "var(--shadow-sm)" : "none",
             border: "none",
           }}>
-          🌙 Nights
+          🌙 Extra Events
         </button>
       </div>
 
@@ -536,13 +573,13 @@ export function SchedulePage() {
         </>
       )}
 
-      {/* ── NIGHTS VIEW ── */}
+      {/* ── EXTRA EVENTS VIEW ── */}
       {view === "nights" && (
         <>
           {/* Night tabs */}
-          <div className="flex gap-1.5 mb-5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+          <div className="flex gap-1.5 mb-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             {nightTabs.map((t) => {
-              const count = afterHoursEvents.filter(e => e.night === t.key).length
+              const count = afterHoursEvents.filter(e => e.night === t.key && !hiddenAfterHours.has(e.id)).length
               return (
                 <button key={t.key} onClick={() => setActiveNight(t.key)}
                   className="flex-shrink-0 flex flex-col items-center rounded-xl py-2 px-3 cursor-pointer transition-all duration-200"
@@ -563,14 +600,43 @@ export function SchedulePage() {
             })}
           </div>
 
+          {/* Hide-sync notice + Show hidden toggle */}
+          {(() => {
+            const hiddenHere = afterHoursEvents.filter(e => e.night === activeNight && hiddenAfterHours.has(e.id)).length
+            return (
+              <div className="flex items-center justify-between mb-4 text-[11px]">
+                <span style={{ color: "var(--text-muted)" }}>
+                  Removing an event hides it on all team devices.
+                </span>
+                {hiddenHere > 0 && (
+                  <button onClick={() => setShowHiddenAfterHours(v => !v)}
+                    className="flex items-center gap-1 font-semibold cursor-pointer px-2 py-1 rounded-full border-0"
+                    style={{
+                      background: showHiddenAfterHours ? "var(--text-muted)" : "var(--surface)",
+                      color: showHiddenAfterHours ? "#fff" : "var(--text-secondary)",
+                      border: `1px solid ${showHiddenAfterHours ? "var(--text-muted)" : "var(--border)"}`,
+                    }}>
+                    {showHiddenAfterHours ? <Eye size={11} /> : <EyeOff size={11} />}
+                    {showHiddenAfterHours ? "Hiding hidden" : `Show hidden (${hiddenHere})`}
+                  </button>
+                )}
+              </div>
+            )
+          })()}
+
           {/* Event cards */}
           {(() => {
-            const events = afterHoursEvents.filter(e => e.night === activeNight)
+            const allEvents = afterHoursEvents.filter(e => e.night === activeNight)
+            const events = showHiddenAfterHours
+              ? allEvents
+              : allEvents.filter(e => !hiddenAfterHours.has(e.id))
             if (events.length === 0) {
               return (
                 <div className="text-center py-16" style={{ color: "var(--text-muted)" }}>
                   <Moon size={32} className="mx-auto mb-2 opacity-30" />
-                  <div className="text-sm">No events found for this night.</div>
+                  <div className="text-sm">
+                    {allEvents.length > 0 ? "All events here are hidden." : "No events found for this night."}
+                  </div>
                 </div>
               )
             }
@@ -587,7 +653,9 @@ export function SchedulePage() {
                       </div>
                     )}
                     {nonSpots.map((ev: AfterHoursEvent) => (
-                      <NightEventCard key={ev.id} event={ev} />
+                      <NightEventCard key={ev.id} event={ev}
+                        hidden={hiddenAfterHours.has(ev.id)}
+                        onToggleHide={() => toggleHideAfterHours(ev.id)} />
                     ))}
                   </div>
                 )}
@@ -597,7 +665,9 @@ export function SchedulePage() {
                       Worth Checking Out
                     </div>
                     {spots.map((ev: AfterHoursEvent) => (
-                      <NightEventCard key={ev.id} event={ev} />
+                      <NightEventCard key={ev.id} event={ev}
+                        hidden={hiddenAfterHours.has(ev.id)}
+                        onToggleHide={() => toggleHideAfterHours(ev.id)} />
                     ))}
                   </div>
                 )}
@@ -761,29 +831,50 @@ export function SchedulePage() {
   )
 }
 
-function NightEventCard({ event }: { event: AfterHoursEvent }) {
+function NightEventCard({ event, hidden, onToggleHide }: {
+  event: AfterHoursEvent
+  hidden?: boolean
+  onToggleHide?: () => void
+}) {
   const aStyle = accessStyle[event.access] || accessStyle.invite
   const emoji = typeEmoji[event.type] || "🎟️"
   const label = accessLabel[event.access] || event.access
 
   return (
-    <div className="rounded-xl p-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-      {/* Top row: time + access badge */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5">
+    <div className="rounded-xl p-4 relative"
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        opacity: hidden ? 0.55 : 1,
+      }}>
+      {/* Top row: time + access badge + hide button */}
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-base leading-none">{emoji}</span>
           {event.time && (
-            <span className="text-[12px] font-semibold" style={{ color: "var(--accent)" }}>{event.time}</span>
+            <span className="text-[12px] font-semibold truncate" style={{ color: "var(--accent)" }}>{event.time}</span>
           )}
         </div>
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
-          style={{ background: aStyle.bg, color: aStyle.color }}>
-          {label}
-        </span>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
+            style={{ background: aStyle.bg, color: aStyle.color }}>
+            {label}
+          </span>
+          {onToggleHide && (
+            <button onClick={onToggleHide}
+              className="w-6 h-6 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 active:scale-90 border-0 bg-transparent"
+              title={hidden ? "Unhide (restores on all team devices)" : "Remove from Extra Events (hides on all team devices)"}>
+              {hidden
+                ? <Eye size={13} style={{ color: "var(--text-muted)" }} />
+                : <X size={13} style={{ color: "var(--text-muted)", opacity: 0.5 }} />}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Title */}
-      <div className="font-bold text-[14px] leading-snug mb-1" style={{ color: "var(--text)" }}>
+      <div className="font-bold text-[14px] leading-snug mb-1"
+        style={{ color: "var(--text)", textDecoration: hidden ? "line-through" : "none" }}>
         {event.title}
       </div>
 
