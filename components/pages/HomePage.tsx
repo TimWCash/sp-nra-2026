@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { MapPin, Calendar, Clock, Building2, Store, Users, MessageCircle, ExternalLink, Wifi, Mic, UserPlus, Zap, Target, Trophy, ArrowRight, Camera, Plus, Minus, RotateCcw, ChevronDown, Plane, Hotel, House, Car, StickyNote } from "lucide-react"
+import { MapPin, Calendar, Clock, Building2, Store, Users, MessageCircle, ExternalLink, Mic, UserPlus, Zap, Target, ArrowRight, Camera, Plus, Minus, RotateCcw, ChevronDown, Plane, Hotel, House, Car, StickyNote } from "lucide-react"
+import { QRCodeSVG } from "qrcode.react"
 import { useCountdown } from "@/hooks/useCountdown"
 import { team as teamMembers } from "@/lib/data"
 import { supabase } from "@/lib/supabase"
@@ -33,10 +34,14 @@ export function HomePage({ onNavigate }: HomePageProps) {
   const [travelOpen, setTravelOpen] = useState(false)
   const [flightOverrides, setFlightOverrides] = useState<Record<string, FlightEntry[]>>({})
   const [accommodationOverrides, setAccommodationOverrides] = useState<Record<string, string>>({})
+  const [bookUrl, setBookUrl] = useState("https://sp-nra-2026.vercel.app/book")
 
   useEffect(() => {
     setFlightOverrides(readLocal(FLIGHTS_KEY, {}))
     setAccommodationOverrides(readLocal(ACCOMMODATION_KEY, {}))
+    if (typeof window !== "undefined") {
+      setBookUrl(`${window.location.origin}/book`)
+    }
   }, [])
 
   const fetchVisitors = useCallback(async () => {
@@ -367,20 +372,26 @@ export function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </div>
 
-      {/* Wi-Fi Warning */}
-      <div className="rounded-xl p-3 mb-4 flex gap-2.5 items-start text-[13px]"
-        style={{ background: "var(--amber-light)", border: "1px solid var(--amber)", color: "var(--amber-fg)" }}>
-        <Wifi size={15} className="flex-shrink-0 mt-0.5" style={{ color: "var(--amber)" }} />
-        <span>No Wi-Fi on show floor &amp; limited cell service. Download offline content before arriving.</span>
-      </div>
-
-      {/* Social + Hype */}
-      <div className="rounded-xl p-4 mb-2 text-center"
+      {/* Podcast Booking QR */}
+      <div className="rounded-xl p-5 mb-2 text-center"
         style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-        <Trophy size={24} className="mx-auto mb-2" style={{ color: "var(--accent)" }} />
-        <div className="font-bold text-sm" style={{ color: "var(--text)" }}>Let&apos;s make this the best show yet.</div>
-        <div className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
-          Tag <strong style={{ color: "var(--accent)" }}>#2026RestaurantShow</strong> on socials
+        <div className="flex items-center justify-center gap-1.5 mb-2">
+          <Mic size={14} style={{ color: "var(--accent)" }} />
+          <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--accent)" }}>
+            Joy of Ops Podcast
+          </span>
+        </div>
+        <div className="font-bold text-base mb-1" style={{ color: "var(--text)" }}>
+          Book a Guest Slot
+        </div>
+        <div className="text-[13px] mb-3" style={{ color: "var(--text-muted)" }}>
+          Show guests this QR to reserve a 30-min recording at Booth #7365
+        </div>
+        <div className="inline-block rounded-lg p-3" style={{ background: "#fff", border: "1px solid var(--border)" }}>
+          <QRCodeSVG value={bookUrl} size={180} level="H" fgColor="#1a2332" bgColor="#ffffff" />
+        </div>
+        <div className="text-[11px] mt-3 font-mono" style={{ color: "var(--text-muted)" }}>
+          {bookUrl.replace(/^https?:\/\//, "")}
         </div>
       </div>
     </div>

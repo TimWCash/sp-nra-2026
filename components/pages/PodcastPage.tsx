@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Mic, X, Clock, User, Building2, MessageSquare, Phone, Trash2, Share2, Check } from "lucide-react"
+import { Mic, X, Clock, User, Building2, MessageSquare, Phone, Trash2, Share2, Check, QrCode } from "lucide-react"
+import { QRCodeSVG } from "qrcode.react"
 import { supabase } from "@/lib/supabase"
 
 interface PodcastSlot {
@@ -37,6 +38,14 @@ export function PodcastPage() {
   const [detailSlot, setDetailSlot] = useState<PodcastSlot | null>(null)
   const [copyLabel, setCopyLabel] = useState<"share" | "copied">("share")
   const [loading, setLoading] = useState(true)
+  const [qrOpen, setQrOpen] = useState(false)
+  const [bookUrl, setBookUrl] = useState("https://sp-nra-2026.vercel.app/book")
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setBookUrl(`${window.location.origin}/book`)
+    }
+  }, [])
 
   // form fields
   const [guestName, setGuestName] = useState("")
@@ -111,13 +120,20 @@ export function PodcastPage() {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-2">
         <h1 className="text-xl font-bold" style={{ color: "var(--text)" }}>Podcast Schedule</h1>
-        <button onClick={shareLink}
-          className="flex items-center gap-1.5 rounded-lg text-[13px] font-semibold py-2 px-3 cursor-pointer transition-all duration-200 active:scale-[0.97]"
-          style={{ background: "var(--accent-light)", color: "var(--accent)", border: "1px solid var(--accent)" }}>
-          {copyLabel === "copied" ? <><Check size={13} /> Copied!</> : <><Share2 size={13} /> Share booking link</>}
-        </button>
+        <div className="flex gap-1.5">
+          <button onClick={() => setQrOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg text-[13px] font-semibold py-2 px-3 cursor-pointer transition-all duration-200 active:scale-[0.97]"
+            style={{ background: "var(--accent)", color: "var(--accent-fg)", border: "1px solid var(--accent)" }}>
+            <QrCode size={13} /> Show QR
+          </button>
+          <button onClick={shareLink}
+            className="flex items-center gap-1.5 rounded-lg text-[13px] font-semibold py-2 px-3 cursor-pointer transition-all duration-200 active:scale-[0.97]"
+            style={{ background: "var(--accent-light)", color: "var(--accent)", border: "1px solid var(--accent)" }}>
+            {copyLabel === "copied" ? <><Check size={13} /> Copied!</> : <><Share2 size={13} /> Copy link</>}
+          </button>
+        </div>
       </div>
 
       {/* Info alert */}
@@ -171,6 +187,49 @@ export function PodcastPage() {
             })}
           </div>
         </>
+      )}
+
+      {/* QR Code overlay — for showing to guests at the booth */}
+      {qrOpen && (
+        <div className="fixed inset-0 z-[210] flex flex-col items-center justify-center px-6 py-8 cursor-pointer"
+          style={{ background: "#ffffff" }}
+          onClick={() => setQrOpen(false)}>
+          <button onClick={() => setQrOpen(false)}
+            className="absolute top-5 right-5 w-10 h-10 rounded-full flex items-center justify-center cursor-pointer"
+            style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", color: "#64748b" }}>
+            <X size={18} />
+          </button>
+
+          <div className="flex items-center gap-2 mb-2">
+            <Mic size={18} color="#008493" />
+            <span className="text-[12px] font-bold tracking-widest uppercase" style={{ color: "#008493" }}>Joy of Ops Podcast</span>
+          </div>
+          <h2 className="text-2xl font-extrabold mb-1 text-center" style={{ color: "#1a2332" }}>
+            Scan to Book a Slot
+          </h2>
+          <p className="text-sm text-center mb-6" style={{ color: "#64748b" }}>
+            30 minutes · Live at Booth #7365
+          </p>
+
+          <div className="rounded-2xl p-5"
+            style={{ background: "#ffffff", border: "3px solid #008493", boxShadow: "0 20px 50px rgba(0,132,147,0.25)" }}>
+            <QRCodeSVG
+              value={bookUrl}
+              size={280}
+              level="H"
+              marginSize={0}
+              fgColor="#1a2332"
+              bgColor="#ffffff"
+            />
+          </div>
+
+          <p className="text-[13px] font-mono mt-6 text-center break-all" style={{ color: "#475569" }}>
+            {bookUrl}
+          </p>
+          <p className="text-[12px] mt-4 text-center" style={{ color: "#94a3b8" }}>
+            Tap anywhere to close
+          </p>
+        </div>
       )}
 
       {/* Booking form overlay */}
