@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Download, Copy, Trash2, Users, Flag, Trophy, Mail } from "lucide-react"
+import { Plus, Download, Copy, Trash2, Users, Flag, Trophy, Mail, Sheet, Loader2, CheckCircle2, AlertCircle } from "lucide-react"
 import { useLeads } from "@/components/leads/useLeads"
 import { LeadForm } from "@/components/leads/LeadForm"
 import { LeadCard } from "@/components/leads/LeadCard"
@@ -10,12 +10,17 @@ const CAPTURED_BY_KEY = "sp_nra_captured_by"
 type FilterKey = "all" | "mine" | "hot" | "warm" | "cool" | "followUp"
 
 export function LeadsPage() {
-  const { leads, stats, leaderboard, addLead, deleteLead, toggleFollowUp, clearAll, exportCSV, emailLeads, copyAll } = useLeads()
+  const {
+    leads, stats, leaderboard, addLead, deleteLead, toggleFollowUp,
+    clearAll, exportCSV, emailLeads, copyAll,
+    syncStatus, pendingCount, isSyncing, syncNow, backfillToSheet,
+  } = useLeads()
   const [formOpen, setFormOpen] = useState(false)
   const [copyLabel, setCopyLabel] = useState("Copy All")
   const [filter, setFilter] = useState<FilterKey>("all")
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [myName, setMyName] = useState("")
+  const [syncLabel, setSyncLabel] = useState<string | null>(null)
 
   useEffect(() => {
     const saved = localStorage.getItem(CAPTURED_BY_KEY)
@@ -26,6 +31,42 @@ export function LeadsPage() {
     const ok = await copyAll()
     if (ok) { setCopyLabel("Copied!"); setTimeout(() => setCopyLabel("Copy All"), 2000) }
   }
+
+  async function handleSyncToSheet() {
+    if (isSyncing) return
+    // If there's a pending queue, just retry those first (no dupe risk).
+    if (pendingCount > 0) {
+      const n = await syncNow()
+      setSyncLabel(n > 0 ? `Synced ${n}` : "Nothing to sync")
+      setTimeout(() => setSyncLabel(null), 2500)
+      return
+    }
+    // Otherwise backfill — warn about possible dupes from other devices.
+    const ok = confirm(
+      `Push all ${leads.length} leads to the Google Sheet?\n\n` +
+      `Leads already pushed from THIS device will be skipped. ` +
+      `Leads pushed from other devices may appear as duplicates in the Sheet.`
+    )
+    if (!ok) return
+    const n = await backfillToSheet()
+    setSyncLabel(n > 0 ? `Pushed ${n} to Sheet` : "All up to date")
+    setTimeout(() => setSyncLabel(null), 2500)
+  }
+
+  const syncIcon = isSyncing
+    ? <Loader2 size={14} className="animate-spin" />
+    : syncStatus === "synced"
+      ? <CheckCircle2 size={14} />
+      : syncStatus === "pending" || syncStatus === "error"
+        ? <AlertCircle size={14} />
+        : <Sheet size={14} />
+
+  const syncButtonLabel = syncLabel
+    ?? (isSyncing
+      ? "Syncing…"
+      : pendingCount > 0
+        ? `Retry (${pendingCount})`
+        : "Sheet")
 
   function handleSave(data: Parameters<typeof addLead>[0]) {
     // Duplicate detection
@@ -123,7 +164,19 @@ export function LeadsPage() {
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2 mb-4">
+          <div className="flex gap-2 mb-2">
+            <button
+              onClick={handleSyncToSheet}
+              disabled={isSyncing}
+              aria-label={pendingCount > 0 ? `Retry syncing ${pendingCount} queued leads to Google Sheet` : "Push all leads to Google Sheet"}
+              className="flex-1 flex items-center justify-center gap-1.5 rounded-lg text-[13px] font-semibold py-2.5 cursor-pointer transition-all duration-200 active:scale-[0.97] disabled:opacity-60 disabled:cursor-wait"
+              style={{
+                background: pendingCount > 0 ? "var(--amber-light, var(--surface))" : "var(--surface)",
+                border: `1px solid ${pendingCount > 0 ? "var(--amber, var(--border))" : "var(--border)"}`,
+                color: pendingCount > 0 ? "var(--amber, var(--text))" : "var(--text)",
+              }}>
+              {syncIcon} {syncButtonLabel}
+            </button>
             <button onClick={exportCSV} className="flex-1 flex items-center justify-center gap-1.5 rounded-lg text-[13px] font-semibold py-2.5 cursor-pointer transition-all duration-200 active:scale-[0.97]"
               style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}>
               <Download size={14} /> CSV
@@ -132,6 +185,8 @@ export function LeadsPage() {
               style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}>
               <Copy size={14} /> {copyLabel}
             </button>
+          </div>
+          <div className="flex gap-2 mb-4">
             <button onClick={emailLeads} className="flex-1 flex items-center justify-center gap-1.5 rounded-lg text-[13px] font-semibold py-2.5 cursor-pointer transition-all duration-200 active:scale-[0.97]"
               style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}>
               <Mail size={14} /> Email
