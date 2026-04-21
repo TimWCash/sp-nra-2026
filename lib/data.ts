@@ -613,10 +613,6 @@ export interface KeyDate {
 }
 
 export const keyDates: KeyDate[] = [
-  { label: "Advanced Freight to Freeman", date: "Apr 1", variant: "muted" },
-  { label: "Freeman Discount Deadline", date: "Apr 13", variant: "teal" },
-  { label: "Lead Retrieval Order Deadline", date: "Apr 2", variant: "teal" },
-  { label: "Last Freight to Freeman Warehouse", date: "Apr 19\u201330", variant: "teal" },
   { label: "Display must be installed by", date: "May 15, 4pm", variant: "red" },
   { label: "Move-In Window", date: "May 11\u201315", variant: "green" },
   { label: "SHOW OPEN", date: "May 16\u201319", variant: "green" },

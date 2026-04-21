@@ -408,24 +408,6 @@ export function SchedulePage() {
               </div>
             ))}
           </div>
-
-          <h2 className="text-lg font-bold mt-6 mb-3" style={{ color: "var(--text)" }}>Move-In Window</h2>
-          <div className="rounded-xl overflow-hidden"
-            style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
-            {[
-              { label: "Warehouse Freight Move-In", date: "May 11", variant: "muted" },
-              { label: "Show-Site Freight Receiving", date: "May 12", variant: "muted" },
-              { label: "Display must be installed by", date: "May 15, 4pm", variant: "red" },
-            ].map((item, i) => (
-              <div key={i} className={`flex justify-between items-center px-4 py-3 text-sm ${i < 2 ? "border-b" : ""}`}
-                style={{ borderColor: "var(--border)" }}>
-                <span style={{ color: "var(--text-secondary)" }}>{item.label}</span>
-                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${item.variant === "red" ? "bg-sp-danger-light text-sp-danger" : "bg-sp-surface-alt text-sp-muted"}`}>
-                  {item.date}
-                </span>
-              </div>
-            ))}
-          </div>
         </>
       )}
 
