@@ -422,6 +422,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
 
       {/* Upcoming Podcast Guests */}
       <button onClick={() => onNavigate?.("podcast")}
+        aria-label={guestsTotal > 0 ? `Open podcast schedule — ${guestsTotal} guest${guestsTotal === 1 ? "" : "s"} booked` : "Open podcast schedule — no guests booked yet"}
         className="w-full rounded-xl p-4 mb-3 text-left cursor-pointer transition-all duration-200 active:scale-[0.99]"
         style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
         <div className="flex items-center justify-between mb-2">
