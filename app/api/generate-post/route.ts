@@ -8,6 +8,8 @@ import { NextResponse } from "next/server"
 
 type Note = { author: string; content: string }
 
+type OpenerStyle = "stat" | "scene" | "contrarian" | "question" | "observation"
+
 type Body = {
   sessionTitle?: string
   sessionCategory?: string
@@ -16,11 +18,44 @@ type Body = {
   notes?: Note[]
   tone?: "professional" | "casual" | "punchy"
   length?: "short" | "medium"
+  // When the UI hits "Regenerate" it cycles through opener styles so drafts
+  // don't all start the same boring way.
+  openerStyle?: OpenerStyle
 }
 
 // Model defaults to Haiku (cheapest). Override via ANTHROPIC_MODEL if you
 // ever want to try a bigger model without a code change.
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5"
+
+const OPENER_GUIDES: Record<OpenerStyle, string> = {
+  stat: `Open by leading with a specific number or data point lifted from the notes. No throat-clearing, no "I attended…". Just the number and what it means.
+EXAMPLE OPENING (don't copy — use one FROM THE NOTES):
+"60% of operators are raising prices again in 2026. Most still can't tell you where the margin went."`,
+
+  scene: `Open by painting a short concrete scene from the room or the moment — something sensory or specific. Then pivot to the idea.
+EXAMPLE OPENING:
+"Room was packed. Standing room only. That tells you everything about where operators' heads are right now."`,
+
+  contrarian: `Open by challenging a conventional assumption the session touched on. State the popular view, then push back on it using what you heard.
+EXAMPLE OPENING:
+"Everyone says cross-training solves retention. The speakers today made me wonder if we've been solving the wrong problem."`,
+
+  question: `Open with a pointed, specific question the session forced you to sit with. Not rhetorical fluff — a real question an operator would actually chew on.
+EXAMPLE OPENING:
+"If your labor model breaks when one shift leader calls out, is it actually a model?"`,
+
+  observation: `Open with an unexpected thing you noticed — a pattern, a tension, a thing nobody else seems to be saying out loud. Specific, not generic.
+EXAMPLE OPENING:
+"Three different sessions today. Zero mention of the guest. That's its own data point."`,
+}
+
+const STYLE_CYCLE: OpenerStyle[] = ["stat", "scene", "contrarian", "question", "observation"]
+
+function pickStyle(requested?: OpenerStyle): OpenerStyle {
+  if (requested && STYLE_CYCLE.includes(requested)) return requested
+  // Deterministic-ish rotation when caller doesn't specify
+  return STYLE_CYCLE[Math.floor(Math.random() * STYLE_CYCLE.length)]
+}
 
 export async function POST(req: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY
@@ -46,6 +81,8 @@ export async function POST(req: Request) {
 
   const tone = body.tone || "professional"
   const length = body.length || "medium"
+  const openerStyle = pickStyle(body.openerStyle)
+
   const lengthGuide =
     length === "short"
       ? "Keep it tight — 60-100 words. 1-2 short paragraphs."
@@ -62,17 +99,29 @@ export async function POST(req: Request) {
     .map((n) => `- ${n.author ? `[${n.author}] ` : ""}${n.content}`)
     .join("\n")
 
-  const system = `You are a writing assistant for a restaurant-tech consulting firm called Service Physics. Your job is to turn raw notes from a team member attending an NRA Show 2026 session into a LinkedIn post draft written from that attendee's perspective.
+  const system = `You are a writing assistant for a restaurant-operations consulting firm called Service Physics. Your job is to turn raw notes from a team member attending an NRA Show 2026 session into a LinkedIn post draft written from that attendee's first-person perspective.
 
-Rules:
+Hard rules:
 - The post is a DRAFT. Someone will edit it before publishing.
-- Do NOT fabricate stats, quotes, or speaker names that aren't in the notes.
-- If the notes are thin, be honest about what stood out — don't pad.
-- Pull out 1-2 concrete takeaways a restaurant operator would care about.
-- Tag Service Physics work naturally if relevant (ops, labor, guest experience, speed of service) — don't force it.
-- End with a soft question or invitation to respond. No "drop a 🚀 in the comments" cringe.
-- Do NOT use hashtags unless the notes request them.
-- Do NOT wrap in quotes or say "Here's a draft:" — output only the post body.`
+- Ground EVERYTHING in the notes. Do NOT invent stats, quotes, speaker names, or session details that aren't in the notes.
+- If the notes are thin, lean into the one specific thing that stood out. Don't pad with generic industry commentary.
+- Pull out 1-2 concrete takeaways a restaurant operator would actually care about (labor, ops, guest experience, speed of service, margin).
+- End with ONE soft, specific question inviting a real reply. Not "drop a 🚀", not "what do you think?" — something pointed.
+- Do NOT use hashtags.
+- Do NOT wrap the output in quotes or say "Here's a draft". Output only the post body.
+
+BANNED opening patterns — these are LinkedIn clichés, do NOT use any variation of them:
+- "Just sat through…"
+- "Just wrapped up…"
+- "Just attended…"
+- "Had the pleasure of attending…"
+- "Key takeaway from…"
+- "Three takeaways from today's session on…"
+- "Attended a great session today on…"
+- "What a session!"
+- Any opener that names the conference/session in the first sentence.
+
+The first 10 words of your post are the most important thing in the whole piece. Make them stop the scroll.`
 
   const user = `Session: ${body.sessionTitle || "(unknown)"}
 ${body.sessionCategory ? `Category: ${body.sessionCategory}\n` : ""}${body.sessionLocation ? `Location: ${body.sessionLocation}\n` : ""}${body.sessionDay ? `Day: ${body.sessionDay}\n` : ""}
@@ -82,7 +131,10 @@ ${notesBlock}
 ${toneGuide}
 ${lengthGuide}
 
-Write the LinkedIn post now.`
+OPENING STYLE for this draft: ${openerStyle.toUpperCase()}
+${OPENER_GUIDES[openerStyle]}
+
+Now write the LinkedIn post. Grounded in the notes. No clichés. Make the first line earn attention.`
 
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -95,6 +147,8 @@ Write the LinkedIn post now.`
       body: JSON.stringify({
         model: DEFAULT_MODEL,
         max_tokens: 600,
+        // Push variety: default is 1.0 but we set it explicitly so we know.
+        temperature: 1.0,
         system,
         messages: [{ role: "user", content: user }],
       }),
@@ -121,7 +175,7 @@ Write the LinkedIn post now.`
       return NextResponse.json({ error: "Claude returned an empty response." }, { status: 502 })
     }
 
-    return NextResponse.json({ post })
+    return NextResponse.json({ post, openerStyle })
   } catch (err) {
     console.error("generate-post error:", err)
     return NextResponse.json(

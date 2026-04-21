@@ -7,6 +7,16 @@ import { team as teamData } from "@/lib/data"
 
 const USER_NAME_KEY = "sp_user_name"
 
+type OpenerStyle = "stat" | "scene" | "contrarian" | "question" | "observation"
+const STYLE_CYCLE: OpenerStyle[] = ["stat", "scene", "contrarian", "question", "observation"]
+const STYLE_LABEL: Record<OpenerStyle, string> = {
+  stat: "Lead with a stat",
+  scene: "Paint the scene",
+  contrarian: "Contrarian take",
+  question: "Open with a question",
+  observation: "Unexpected observation",
+}
+
 type Note = {
   id: string
   session_title: string
@@ -57,6 +67,10 @@ export function SessionNotes({ sessionTitle, sessionDay, sessionCategory, sessio
   const [generatedPost, setGeneratedPost] = useState<string | null>(null)
   const [genError, setGenError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  // Rotating index into STYLE_CYCLE — each regen steps forward so the user
+  // sees a genuinely different angle instead of the same draft twice.
+  const [styleIndex, setStyleIndex] = useState(0)
+  const [lastStyle, setLastStyle] = useState<OpenerStyle | null>(null)
 
   useEffect(() => {
     setUserName(loadUserName())
@@ -127,11 +141,15 @@ export function SessionNotes({ sessionTitle, sessionDay, sessionCategory, sessio
     if (draft.trim()) saveNote()
   }
 
-  async function generatePost() {
+  async function generatePost(isRegen = false) {
     setGenerating(true)
     setGenError(null)
     setGeneratedPost(null)
     setShowDraft(true)
+    // Rotate to the next opener style on regen; use the current index on first call.
+    const idx = isRegen ? (styleIndex + 1) % STYLE_CYCLE.length : styleIndex
+    setStyleIndex(idx)
+    const openerStyle = STYLE_CYCLE[idx]
     try {
       const res = await fetch("/api/generate-post", {
         method: "POST",
@@ -142,6 +160,7 @@ export function SessionNotes({ sessionTitle, sessionDay, sessionCategory, sessio
           sessionLocation,
           sessionDay,
           notes: notes.map((n) => ({ author: n.author, content: n.content })),
+          openerStyle,
         }),
       })
       const json = await res.json().catch(() => ({}))
@@ -149,6 +168,7 @@ export function SessionNotes({ sessionTitle, sessionDay, sessionCategory, sessio
         setGenError(json.error || `Request failed (${res.status})`)
       } else {
         setGeneratedPost(json.post)
+        setLastStyle((json.openerStyle as OpenerStyle) || openerStyle)
       }
     } catch (err) {
       setGenError(err instanceof Error ? err.message : "Unknown error")
@@ -247,7 +267,7 @@ export function SessionNotes({ sessionTitle, sessionDay, sessionCategory, sessio
       {/* Generate LinkedIn post */}
       {notes.length > 0 && (
         <button
-          onClick={generatePost}
+          onClick={() => generatePost(false)}
           disabled={generating}
           className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-[13px] font-bold cursor-pointer active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-wait border-0"
           style={{
@@ -322,7 +342,9 @@ export function SessionNotes({ sessionTitle, sessionDay, sessionCategory, sessio
               {generating && (
                 <div className="text-center py-10" style={{ color: "var(--text-muted)" }}>
                   <Loader2 size={22} className="mx-auto animate-spin mb-2" />
-                  <div className="text-[13px]">Drafting your post with Claude…</div>
+                  <div className="text-[13px]">
+                    Drafting with a <b>{STYLE_LABEL[STYLE_CYCLE[styleIndex]].toLowerCase()}</b> angle…
+                  </div>
                 </div>
               )}
               {genError && (
@@ -332,22 +354,32 @@ export function SessionNotes({ sessionTitle, sessionDay, sessionCategory, sessio
                 </div>
               )}
               {generatedPost && (
-                <textarea
-                  value={generatedPost}
-                  onChange={(e) => setGeneratedPost(e.target.value)}
-                  className="w-full text-[13px] leading-relaxed px-3 py-3 rounded-xl outline-none resize-none"
-                  rows={14}
-                  style={{ background: "var(--surface-alt)", border: "1px solid var(--border)", color: "var(--text)" }}
-                />
+                <>
+                  {lastStyle && (
+                    <div className="text-[11px] font-semibold mb-2 flex items-center gap-1.5"
+                      style={{ color: "var(--text-muted)" }}>
+                      <Sparkles size={11} style={{ color: "var(--accent)" }} />
+                      Angle: <span style={{ color: "var(--accent)" }}>{STYLE_LABEL[lastStyle]}</span>
+                      <span className="ml-auto text-[10px]">Regenerate to try a different one.</span>
+                    </div>
+                  )}
+                  <textarea
+                    value={generatedPost}
+                    onChange={(e) => setGeneratedPost(e.target.value)}
+                    className="w-full text-[13px] leading-relaxed px-3 py-3 rounded-xl outline-none resize-none"
+                    rows={14}
+                    style={{ background: "var(--surface-alt)", border: "1px solid var(--border)", color: "var(--text)" }}
+                  />
+                </>
               )}
             </div>
 
             {generatedPost && (
               <div className="px-5 pb-4 pt-2 border-t flex gap-2" style={{ borderColor: "var(--border)" }}>
-                <button onClick={generatePost} disabled={generating}
+                <button onClick={() => generatePost(true)} disabled={generating}
                   className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 px-3 text-[12px] font-bold cursor-pointer active:scale-[0.98] transition-all border"
                   style={{ background: "var(--surface)", color: "var(--text-secondary)", borderColor: "var(--border)" }}>
-                  <RefreshCw size={13} /> Regenerate
+                  <RefreshCw size={13} /> New angle
                 </button>
                 <button onClick={copyPost}
                   className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-bold cursor-pointer active:scale-[0.98] transition-all border-0"
