@@ -1,12 +1,21 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, Zap } from "lucide-react"
+import { X, Zap, Camera, UserPlus } from "lucide-react"
 import type { PageId } from "@/components/layout/BottomNav"
 
 const SEEN_KEY = "sp_onboarding_seen"
 
-const steps = [
+type Step = {
+  icon: string
+  title: string
+  body: string
+  tip: string
+  cta?: { label: string; page: PageId }
+  ctas?: { label: string; page: PageId; icon: "lead" | "camera" }[]
+}
+
+const steps: Step[] = [
   {
     icon: "🦇",
     title: "Set up Bat Signal alerts",
@@ -25,6 +34,16 @@ const steps = [
     title: "Capture Leads",
     body: "Tap Leads in the bottom nav → tap + to log a new contact. Snap their badge photo, set the heat level, and save. It syncs to the team Google Sheet automatically.",
     tip: "Even just a name is worth logging.",
+  },
+  {
+    icon: "🏆",
+    title: "Prove you did it",
+    body: "Your definition of done: either add a fictional lead for your favorite Disney character (Mickey Mouse, Booth #A113 😉) OR drop a pre-NRA selfie in Photos. If the whole team does one or the other before Saturday, we know everyone's set up for real.",
+    tip: "Pick your weapon — lead or photo.",
+    ctas: [
+      { label: "Add Disney lead", page: "leads" as PageId, icon: "lead" },
+      { label: "Upload a selfie", page: "photos" as PageId, icon: "camera" },
+    ],
   },
 ]
 
@@ -120,6 +139,26 @@ export function OnboardingModal({ onNavigate }: OnboardingModalProps = {}) {
                 Skip for now — I&apos;ll do it later
               </button>
             </>
+          ) : current.ctas && onNavigate ? (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                {current.ctas.map((c) => (
+                  <button
+                    key={c.label}
+                    onClick={() => { close(); onNavigate(c.page) }}
+                    className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-[13px] font-bold cursor-pointer active:scale-[0.98] transition-all duration-150 border-0"
+                    style={{ background: "var(--accent)", color: "var(--accent-fg)" }}>
+                    {c.icon === "lead" ? <UserPlus size={15} /> : <Camera size={15} />}
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+              <button onClick={close}
+                className="w-full text-center text-[12px] pt-3 pb-1 cursor-pointer bg-transparent border-0"
+                style={{ color: "var(--text-muted)" }}>
+                I&apos;ll do it later
+              </button>
+            </>
           ) : (
             <button onClick={next}
               className="w-full rounded-xl py-3.5 text-[15px] font-bold cursor-pointer active:scale-[0.98] transition-all duration-150 border-0"
@@ -128,7 +167,7 @@ export function OnboardingModal({ onNavigate }: OnboardingModalProps = {}) {
             </button>
           )}
 
-          {step < steps.length - 1 && !current.cta && (
+          {step < steps.length - 1 && !current.cta && !current.ctas && (
             <button onClick={close}
               className="w-full text-center text-[12px] pt-3 pb-1 cursor-pointer bg-transparent border-0"
               style={{ color: "var(--text-muted)" }}>
