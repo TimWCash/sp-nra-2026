@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Users, Target, CheckCircle } from "lucide-react"
 import { team as teamData } from "@/lib/data"
 import { NotificationPermission } from "@/components/NotificationPermission"
@@ -86,6 +86,9 @@ export function TeamStatusPage() {
   const [batSignal, setBatSignalState] = useState<{ active: boolean; since: number }>({ active: false, since: 0 })
   const [pulse, setPulse] = useState(false)
   const [shiftFilter, setShiftFilter] = useState<ShiftFilter>("all")
+  // Track the previous signal state so we only vibrate on a false→true transition,
+  // not on every render or on the initial mount if the signal was already active.
+  const prevBatActiveRef = useRef<boolean | null>(null)
 
   useEffect(() => {
     setTeam(loadTeam())
@@ -105,6 +108,21 @@ export function TeamStatusPage() {
     if (!batSignal.active) return
     const interval = setInterval(() => setPulse((p) => !p), 800)
     return () => clearInterval(interval)
+  }, [batSignal.active])
+
+  // Vibrate the phone when the bat signal flips on in the foreground. Covers
+  // the case where a teammate is looking at the app and wouldn't get a push
+  // notification. navigator.vibrate is a no-op on iOS Safari; Android honors
+  // the pattern: buzz, pause, buzz, pause, long buzz.
+  useEffect(() => {
+    const prev = prevBatActiveRef.current
+    prevBatActiveRef.current = batSignal.active
+    if (prev === null) return // first render — don't vibrate on mount
+    if (prev === false && batSignal.active === true) {
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate([300, 100, 300, 100, 500])
+      }
+    }
   }, [batSignal.active])
 
   function cycleStatus(index: number) {
@@ -127,6 +145,10 @@ export function TeamStatusPage() {
   const activateBatSignal = useCallback(async () => {
     const now = Date.now()
     setBatSignalState({ active: true, since: now })
+    // Short haptic confirmation on the sender's own device.
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate([150, 80, 150])
+    }
     await postBatSignal(true)
   }, [])
 

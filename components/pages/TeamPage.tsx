@@ -1,29 +1,24 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Plane, Car, House, Hotel, Pencil, Check, X, Plus, Trash2 } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
+import { Plane, Car, House, Hotel, Pencil, Check, X, Plus, Trash2, Loader2 } from "lucide-react"
 import { team as defaultTeam } from "@/lib/data"
+import { supabase } from "@/lib/supabase"
 
+// Legacy localStorage keys. We migrate them up to Supabase on first load, then
+// drop them so the same client doesn't keep pushing stale state back.
 const FLIGHTS_KEY = "sp_flight_overrides"
 const ACCOMMODATION_KEY = "sp_accommodation_overrides"
+const MIGRATED_KEY = "sp_travel_migrated_to_supabase"
 
 interface FlightEntry { label: string; detail: string }
 interface FlightOverrides { [name: string]: FlightEntry[] }
 interface AccommodationOverrides { [name: string]: string }
 
-function loadFlightOverrides(): FlightOverrides {
-  if (typeof window === "undefined") return {}
-  try { return JSON.parse(localStorage.getItem(FLIGHTS_KEY) || "{}") } catch { return {} }
-}
-function saveFlightOverrides(o: FlightOverrides) {
-  localStorage.setItem(FLIGHTS_KEY, JSON.stringify(o))
-}
-function loadAccommodationOverrides(): AccommodationOverrides {
-  if (typeof window === "undefined") return {}
-  try { return JSON.parse(localStorage.getItem(ACCOMMODATION_KEY) || "{}") } catch { return {} }
-}
-function saveAccommodationOverrides(o: AccommodationOverrides) {
-  localStorage.setItem(ACCOMMODATION_KEY, JSON.stringify(o))
+interface TravelRow {
+  name: string
+  flights: FlightEntry[]
+  accommodation: string
 }
 
 // Quick-pick presets for the accommodation field
@@ -37,17 +32,82 @@ function accommodationIcon(value: string) {
   return <Hotel size={12} className="flex-shrink-0" style={{ color: "var(--accent)" }} />
 }
 
+function normalizeFlights(raw: unknown): FlightEntry[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((f): f is FlightEntry =>
+      typeof f === "object" && f !== null &&
+      typeof (f as FlightEntry).label === "string" &&
+      typeof (f as FlightEntry).detail === "string"
+    )
+    .map((f) => ({ label: f.label, detail: f.detail }))
+}
+
 export function TeamPage() {
   const [flightOverrides, setFlightOverrides] = useState<FlightOverrides>({})
   const [accommodationOverrides, setAccommodationOverrides] = useState<AccommodationOverrides>({})
   const [editing, setEditing] = useState<string | null>(null)
   const [draftFlights, setDraftFlights] = useState<FlightEntry[]>([])
   const [draftAccommodation, setDraftAccommodation] = useState<string>("")
+  const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    setFlightOverrides(loadFlightOverrides())
-    setAccommodationOverrides(loadAccommodationOverrides())
+  const applyRows = useCallback((rows: TravelRow[]) => {
+    const nextFlights: FlightOverrides = {}
+    const nextAccommodation: AccommodationOverrides = {}
+    for (const row of rows) {
+      nextFlights[row.name] = row.flights
+      nextAccommodation[row.name] = row.accommodation
+    }
+    setFlightOverrides(nextFlights)
+    setAccommodationOverrides(nextAccommodation)
   }, [])
+
+  const fetchAll = useCallback(async () => {
+    const { data, error } = await supabase.from("team_travel").select("name, flights, accommodation")
+    if (error || !data) return
+    applyRows(data.map((r) => ({
+      name: r.name as string,
+      flights: normalizeFlights(r.flights),
+      accommodation: (r.accommodation as string) ?? "",
+    })))
+  }, [applyRows])
+
+  // One-time migration: push any localStorage overrides up to Supabase.
+  useEffect(() => {
+    const migrate = async () => {
+      if (typeof window === "undefined") return
+      if (localStorage.getItem(MIGRATED_KEY) === "1") return
+
+      let flights: FlightOverrides = {}
+      let accommodation: AccommodationOverrides = {}
+      try { flights = JSON.parse(localStorage.getItem(FLIGHTS_KEY) || "{}") } catch { /* ignore */ }
+      try { accommodation = JSON.parse(localStorage.getItem(ACCOMMODATION_KEY) || "{}") } catch { /* ignore */ }
+
+      const names = new Set([...Object.keys(flights), ...Object.keys(accommodation)])
+      if (names.size > 0) {
+        const rows = Array.from(names).map((name) => ({
+          name,
+          flights: flights[name] ?? [],
+          accommodation: accommodation[name] ?? "",
+        }))
+        // Upsert so we don't clobber edits another device already pushed.
+        await supabase.from("team_travel").upsert(rows, { onConflict: "name", ignoreDuplicates: false })
+      }
+
+      localStorage.setItem(MIGRATED_KEY, "1")
+      // Keep the old keys around as a backup — readable via devtools if needed.
+    }
+    migrate().then(fetchAll)
+  }, [fetchAll])
+
+  // Subscribe to realtime updates so other devices' edits flow in.
+  useEffect(() => {
+    const channel = supabase
+      .channel("team_travel_changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "team_travel" }, fetchAll)
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [fetchAll])
 
   function startEdit(name: string, flights: FlightEntry[], accommodation: string) {
     setEditing(name)
@@ -55,17 +115,33 @@ export function TeamPage() {
     setDraftAccommodation(accommodation)
   }
 
-  function saveDraft() {
-    if (!editing) return
-    const updatedFlights = { ...flightOverrides, [editing]: draftFlights.filter((f) => f.label.trim()) }
-    setFlightOverrides(updatedFlights)
-    saveFlightOverrides(updatedFlights)
+  async function saveDraft() {
+    if (!editing || saving) return
+    setSaving(true)
+    const cleanedFlights = draftFlights.filter((f) => f.label.trim())
+    const cleanedAccommodation = draftAccommodation.trim()
 
-    const updatedAccommodation = { ...accommodationOverrides, [editing]: draftAccommodation.trim() }
-    setAccommodationOverrides(updatedAccommodation)
-    saveAccommodationOverrides(updatedAccommodation)
+    // Optimistic update — flip local state now, realtime will reconcile.
+    setFlightOverrides((prev) => ({ ...prev, [editing]: cleanedFlights }))
+    setAccommodationOverrides((prev) => ({ ...prev, [editing]: cleanedAccommodation }))
 
-    setEditing(null)
+    try {
+      await supabase.from("team_travel").upsert(
+        {
+          name: editing,
+          flights: cleanedFlights,
+          accommodation: cleanedAccommodation,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "name" }
+      )
+      setEditing(null)
+    } catch (err) {
+      console.error("Save travel error:", err)
+      alert("Could not save — check your connection and try again.")
+    } finally {
+      setSaving(false)
+    }
   }
 
   function cancelEdit() { setEditing(null) }
@@ -88,7 +164,7 @@ export function TeamPage() {
       <h1 className="text-xl font-bold mb-4" style={{ color: "var(--text)" }}>Team</h1>
 
       <div className="text-[11px] mb-3" style={{ color: "var(--text-muted)" }}>
-        Tap ✏️ to update your flights or accommodation. Changes save locally on your device.
+        Tap ✏️ to update flights or accommodation. Changes sync to the whole team in real time.
       </div>
 
       {/* Person Cards */}
@@ -126,13 +202,14 @@ export function TeamPage() {
                       </button>
                     ) : (
                       <div className="flex gap-1.5">
-                        <button onClick={saveDraft}
-                          className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg cursor-pointer border-0"
+                        <button onClick={saveDraft} disabled={saving}
+                          className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg cursor-pointer border-0 disabled:opacity-60 disabled:cursor-wait"
                           style={{ background: "var(--success-light)", color: "var(--success)" }}>
-                          <Check size={11} /> Save
+                          {saving ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                          {saving ? "Saving" : "Save"}
                         </button>
-                        <button onClick={cancelEdit}
-                          className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg cursor-pointer border-0"
+                        <button onClick={cancelEdit} disabled={saving}
+                          className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg cursor-pointer border-0 disabled:opacity-60"
                           style={{ background: "var(--surface-alt)", color: "var(--text-muted)" }}>
                           <X size={11} />
                         </button>
