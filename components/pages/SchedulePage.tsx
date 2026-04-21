@@ -5,6 +5,7 @@ import { Clock, AlertTriangle, CircleDot, Search, Map, GraduationCap, ChefHat, W
 import { schedule, dayTabs, afterHoursEvents, type AfterHoursEvent } from "@/lib/data"
 import { nraSessions, sessionCategories, type Session } from "@/lib/sessions"
 import { supabase } from "@/lib/supabase"
+import { SessionNotes } from "@/components/SessionNotes"
 
 type ViewMode = "team" | "sessions" | "nights"
 
@@ -806,6 +807,14 @@ export function SchedulePage() {
                 </div>
               )}
             </div>
+
+            {/* Team Notes + LinkedIn draft */}
+            <SessionNotes
+              sessionTitle={selectedSession.session.title}
+              sessionDay={selectedSession.dayKey}
+              sessionCategory={categoryLabels[selectedSession.session.category] || "Session"}
+              sessionLocation={selectedSession.session.location}
+            />
           </div>
         </div>
       )}
