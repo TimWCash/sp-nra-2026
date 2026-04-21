@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { Users, Target, CheckCircle } from "lucide-react"
 import { team as teamData } from "@/lib/data"
 import { NotificationPermission } from "@/components/NotificationPermission"
+import { supabase } from "@/lib/supabase"
 
 type MemberStatus = "at-booth" | "on-break" | "walking" | "in-meeting" | "off"
 type ShiftValue = "day" | "night" | "both" | undefined
@@ -69,6 +70,16 @@ async function fetchBatSignal(): Promise<{ active: boolean; since: number }> {
   } catch { return { active: false, since: 0 } }
 }
 
+async function fetchSubscriberCount(): Promise<number> {
+  try {
+    const { count, error } = await supabase
+      .from("push_subscriptions")
+      .select("*", { count: "exact", head: true })
+    if (error) return 0
+    return count ?? 0
+  } catch { return 0 }
+}
+
 async function postBatSignal(active: boolean): Promise<void> {
   try {
     await fetch("/api/bat-signal", {
@@ -86,6 +97,7 @@ export function TeamStatusPage() {
   const [batSignal, setBatSignalState] = useState<{ active: boolean; since: number }>({ active: false, since: 0 })
   const [pulse, setPulse] = useState(false)
   const [shiftFilter, setShiftFilter] = useState<ShiftFilter>("all")
+  const [subCount, setSubCount] = useState<number | null>(null)
   // Track the previous signal state so we only vibrate on a false→true transition,
   // not on every render or on the initial mount if the signal was already active.
   const prevBatActiveRef = useRef<boolean | null>(null)
@@ -94,12 +106,14 @@ export function TeamStatusPage() {
     setTeam(loadTeam())
     setLeadCount(getLeadCount())
     fetchBatSignal().then(setBatSignalState)
+    fetchSubscriberCount().then(setSubCount)
   }, [])
 
   useEffect(() => {
     const interval = setInterval(() => {
       fetchBatSignal().then(setBatSignalState)
       setLeadCount(getLeadCount())
+      fetchSubscriberCount().then(setSubCount)
     }, 5000)
     return () => clearInterval(interval)
   }, [])
@@ -228,6 +242,28 @@ export function TeamStatusPage() {
           <span className="text-5xl" style={{ filter: "drop-shadow(0 0 12px rgba(255,200,0,0.8))" }}>🦇</span>
           <div className="text-white font-extrabold text-[17px] tracking-wide">BAT SIGNAL</div>
           <div className="text-white/50 text-[12px]">Booth is slammed — call all hands</div>
+          {subCount !== null && (
+            <div
+              className="mt-1 text-[11px] font-semibold px-2.5 py-1 rounded-full"
+              style={{
+                background: subCount === 0
+                  ? "rgba(220,53,69,0.25)"
+                  : subCount >= teamData.length
+                    ? "rgba(0,200,120,0.2)"
+                    : "rgba(255,200,0,0.15)",
+                color: subCount === 0
+                  ? "#ff8a95"
+                  : subCount >= teamData.length
+                    ? "#7fe4b2"
+                    : "#ffd66b",
+              }}>
+              {subCount === 0
+                ? `⚠️ No devices registered · run setup`
+                : subCount >= teamData.length
+                  ? `✅ ${subCount}/${teamData.length} devices registered`
+                  : `${subCount}/${teamData.length} devices registered`}
+            </div>
+          )}
         </button>
       )}
 
