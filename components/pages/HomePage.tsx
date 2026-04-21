@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { MapPin, Calendar, Clock, Building2, Store, Users, MessageCircle, ExternalLink, Mic, UserPlus, Zap, Target, ArrowRight, Camera, Plus, Minus, RotateCcw, ChevronDown, Plane, Hotel, House, Car, StickyNote } from "lucide-react"
+import { MapPin, Calendar, Clock, Building2, Store, Users, MessageCircle, ExternalLink, Mic, UserPlus, Zap, Target, ArrowRight, Camera, Plus, Minus, RotateCcw, ChevronDown, ChevronRight, Plane, Hotel, House, Car, StickyNote } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 import { useCountdown } from "@/hooks/useCountdown"
 import { team as teamMembers } from "@/lib/data"
@@ -13,6 +13,29 @@ const FLIGHTS_KEY = "sp_flight_overrides"
 const ACCOMMODATION_KEY = "sp_accommodation_overrides"
 
 interface FlightEntry { label: string; detail: string }
+
+interface PodcastBooking {
+  id: string
+  day: string
+  time: string
+  guest_name: string
+  company: string
+}
+
+const DAY_ORDER: Record<string, number> = { sat: 0, sun: 1, mon: 2, tue: 3 }
+const DAY_SHORT: Record<string, string> = { sat: "Sat", sun: "Sun", mon: "Mon", tue: "Tue" }
+
+// "10:00" / "11:30" are AM (morning slots); "1:00"–"4:30" are PM (afternoon)
+function podcastTimeToMinutes(t: string) {
+  const [h, m] = t.split(":").map(Number)
+  const hour24 = h >= 10 ? h : h + 12
+  return hour24 * 60 + m
+}
+function formatPodcastTime(t: string) {
+  const [h, m] = t.split(":").map(Number)
+  const ampm = h >= 10 ? "am" : "pm"
+  return m === 0 ? `${h}${ampm}` : `${h}:${String(m).padStart(2, "0")}${ampm}`
+}
 
 function readLocal<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback
@@ -35,6 +58,8 @@ export function HomePage({ onNavigate }: HomePageProps) {
   const [flightOverrides, setFlightOverrides] = useState<Record<string, FlightEntry[]>>({})
   const [accommodationOverrides, setAccommodationOverrides] = useState<Record<string, string>>({})
   const [bookUrl, setBookUrl] = useState("https://sp-nra-2026.vercel.app/book")
+  const [upcomingGuests, setUpcomingGuests] = useState<PodcastBooking[]>([])
+  const [guestsTotal, setGuestsTotal] = useState(0)
 
   useEffect(() => {
     setFlightOverrides(readLocal(FLIGHTS_KEY, {}))
@@ -42,6 +67,29 @@ export function HomePage({ onNavigate }: HomePageProps) {
     if (typeof window !== "undefined") {
       setBookUrl(`${window.location.origin}/book`)
     }
+  }, [])
+
+  useEffect(() => {
+    function load() {
+      supabase.from("podcast_bookings")
+        .select("id,day,time,guest_name,company")
+        .then(({ data }) => {
+          if (!data) return
+          const sorted = [...data].sort((a, b) => {
+            const da = DAY_ORDER[a.day] ?? 99
+            const db = DAY_ORDER[b.day] ?? 99
+            if (da !== db) return da - db
+            return podcastTimeToMinutes(a.time) - podcastTimeToMinutes(b.time)
+          })
+          setUpcomingGuests(sorted.slice(0, 4))
+          setGuestsTotal(sorted.length)
+        })
+    }
+    load()
+    const channel = supabase.channel("podcast_home")
+      .on("postgres_changes", { event: "*", schema: "public", table: "podcast_bookings" }, load)
+      .subscribe()
+    return () => { channel.unsubscribe() }
   }, [])
 
   const fetchVisitors = useCallback(async () => {
@@ -371,6 +419,53 @@ export function HomePage({ onNavigate }: HomePageProps) {
           </button>
         </div>
       </div>
+
+      {/* Upcoming Podcast Guests */}
+      <button onClick={() => onNavigate?.("podcast")}
+        className="w-full rounded-xl p-4 mb-3 text-left cursor-pointer transition-all duration-200 active:scale-[0.99]"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5">
+            <Mic size={14} style={{ color: "var(--accent)" }} />
+            <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--accent)" }}>
+              Next podcast guests
+            </span>
+            {guestsTotal > 0 && (
+              <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full ml-1"
+                style={{ background: "var(--accent-light)", color: "var(--accent)" }}>
+                {guestsTotal} booked
+              </span>
+            )}
+          </div>
+          <ChevronRight size={14} style={{ color: "var(--text-muted)" }} />
+        </div>
+        {upcomingGuests.length === 0 ? (
+          <div className="text-[13px]" style={{ color: "var(--text-muted)" }}>
+            No guests booked yet. Show the QR below to capture one.
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {upcomingGuests.map((g) => (
+              <div key={g.id} className="flex items-start justify-between gap-2 text-[13px]">
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold truncate" style={{ color: "var(--text)" }}>
+                    {g.guest_name}
+                  </div>
+                  {g.company && (
+                    <div className="truncate" style={{ color: "var(--text-muted)" }}>
+                      {g.company}
+                    </div>
+                  )}
+                </div>
+                <div className="text-[11px] font-bold whitespace-nowrap px-2 py-1 rounded-md"
+                  style={{ background: "var(--accent-light)", color: "var(--accent)" }}>
+                  {DAY_SHORT[g.day] ?? g.day} {formatPodcastTime(g.time)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </button>
 
       {/* Podcast Booking QR */}
       <div className="rounded-xl p-5 mb-2 text-center"
