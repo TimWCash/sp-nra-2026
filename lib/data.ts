@@ -28,6 +28,7 @@ export const schedule: Record<string, ScheduleEvent[]> = {
     { time: "All Day", title: "Booth Staffing + Podcast", sub: "Track all conversations with lead retrieval app" },
     { time: "All Day", title: "Walk the show floor", sub: "Check out neighbors \u00b7 attend key sessions" },
     { time: "5:00pm", title: "Show Floor Closes", highlight: "close" },
+    { time: "Evening", title: "Daily Debrief", sub: "Adjust for tomorrow. Log leads. Restock collateral." },
   ],
   mon: [
     { time: "9:00am", title: "Morning Team Meeting", sub: "Final push \u2014 biggest day" },
