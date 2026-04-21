@@ -347,6 +347,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
           { page: "podcast" as PageId, Icon: Mic, label: "Podcast", sub: "Joy of Ops", accent: "#008493" },
           { page: "leads" as PageId, Icon: UserPlus, label: "Leads", sub: "Capture contacts", accent: "#008493" },
           { page: "photos" as PageId, Icon: Camera, label: "Photos", sub: "Shared album", accent: "#008493" },
+          { page: "setup" as PageId, Icon: Zap, label: "Bat Signal Setup", sub: "Pre-show setup", accent: "#008493" },
         ].map((q) => (
           <button key={q.page + q.label} onClick={() => onNavigate?.(q.page)}
             className="rounded-xl p-3 text-left cursor-pointer transition-all duration-200 active:scale-[0.97]"

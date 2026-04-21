@@ -5,7 +5,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export type PageId = "home" | "schedule" | "booth" | "team" | "talk" | "leads" | "podcast" | "status" | "loadin" | "more" | "photos"
+export type PageId = "home" | "schedule" | "booth" | "team" | "talk" | "leads" | "podcast" | "status" | "loadin" | "more" | "photos" | "setup"
 
 const tabs: { id: PageId; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Home", icon: Home },

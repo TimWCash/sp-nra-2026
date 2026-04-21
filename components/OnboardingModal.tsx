@@ -1,22 +1,18 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, Share, Bell, UserCheck, UserPlus } from "lucide-react"
+import { X, Zap } from "lucide-react"
+import type { PageId } from "@/components/layout/BottomNav"
 
 const SEEN_KEY = "sp_onboarding_seen"
 
 const steps = [
   {
-    icon: "📲",
-    title: "Add to Your Home Screen",
-    body: "Tap the Share icon in Safari → 'Add to Home Screen' → Add. This installs the app so it works offline and feels native.",
-    tip: "Do this first — everything else works better from the home screen.",
-  },
-  {
     icon: "🦇",
-    title: "Enable Bat Signal Alerts",
-    body: "Go to the Team tab → tap 'Enable push alerts for Bat Signal'. This lets you get a real popup on your locked screen when the booth needs backup.",
-    tip: "Takes 2 seconds. You only do it once.",
+    title: "Set up Bat Signal alerts",
+    body: "The most important step. On iPhone you need to install the app to your home screen, then allow notifications. We'll walk you through it and test it.",
+    tip: "Tap below to run the 2-minute setup wizard.",
+    cta: { label: "Run setup wizard", page: "setup" as PageId },
   },
   {
     icon: "🟢",
@@ -32,7 +28,11 @@ const steps = [
   },
 ]
 
-export function OnboardingModal() {
+interface OnboardingModalProps {
+  onNavigate?: (page: PageId) => void
+}
+
+export function OnboardingModal({ onNavigate }: OnboardingModalProps = {}) {
   const [visible, setVisible] = useState(false)
   const [step, setStep] = useState(0)
 
@@ -103,13 +103,32 @@ export function OnboardingModal() {
             </div>
           </div>
 
-          <button onClick={next}
-            className="w-full rounded-xl py-3.5 text-[15px] font-bold cursor-pointer active:scale-[0.98] transition-all duration-150 border-0"
-            style={{ background: "var(--accent)", color: "var(--accent-fg)" }}>
-            {step < steps.length - 1 ? "Next →" : "Got it — let's go 🚀"}
-          </button>
+          {current.cta && onNavigate ? (
+            <>
+              <button
+                onClick={() => {
+                  close()
+                  onNavigate(current.cta!.page)
+                }}
+                className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-[15px] font-bold cursor-pointer active:scale-[0.98] transition-all duration-150 border-0"
+                style={{ background: "var(--accent)", color: "var(--accent-fg)" }}>
+                <Zap size={17} /> {current.cta.label}
+              </button>
+              <button onClick={next}
+                className="w-full text-center text-[12px] pt-3 pb-1 cursor-pointer bg-transparent border-0"
+                style={{ color: "var(--text-muted)" }}>
+                Skip for now — I&apos;ll do it later
+              </button>
+            </>
+          ) : (
+            <button onClick={next}
+              className="w-full rounded-xl py-3.5 text-[15px] font-bold cursor-pointer active:scale-[0.98] transition-all duration-150 border-0"
+              style={{ background: "var(--accent)", color: "var(--accent-fg)" }}>
+              {step < steps.length - 1 ? "Next →" : "Got it — let's go 🚀"}
+            </button>
+          )}
 
-          {step < steps.length - 1 && (
+          {step < steps.length - 1 && !current.cta && (
             <button onClick={close}
               className="w-full text-center text-[12px] pt-3 pb-1 cursor-pointer bg-transparent border-0"
               style={{ color: "var(--text-muted)" }}>

@@ -15,6 +15,7 @@ import { TeamStatusPage } from "@/components/pages/TeamStatusPage"
 import { LoadInOutPage } from "@/components/pages/LoadInOutPage"
 import { MorePage } from "@/components/pages/MorePage"
 import { PhotosPage } from "@/components/pages/PhotosPage"
+import { SetupPage } from "@/components/pages/SetupPage"
 
 const pages: Record<PageId, React.ComponentType<{ onNavigate?: (page: PageId) => void }>> = {
   home: HomePage,
@@ -28,6 +29,7 @@ const pages: Record<PageId, React.ComponentType<{ onNavigate?: (page: PageId) =>
   loadin: LoadInOutPage,
   more: MorePage,
   photos: PhotosPage,
+  setup: SetupPage,
 }
 
 export default function App() {
@@ -42,7 +44,7 @@ export default function App() {
 
   return (
     <>
-      <OnboardingModal />
+      <OnboardingModal onNavigate={navigate} />
       <TopBar />
       <main className="pt-[64px] px-4 pb-[90px] min-h-screen">
         <PageComponent onNavigate={navigate} />
