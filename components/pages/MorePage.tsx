@@ -72,7 +72,7 @@ const HOW_TO: { q: string; a: string }[] = [
 export const TOP_NAV_TILES: { page: PageId; Icon: typeof Users; label: string; sub: string; anchor?: string }[] = [
   { page: "more" as PageId, Icon: StickyNote, label: "Team Notes", sub: "Shared scratchpad", anchor: "notes" },
   { page: "team" as PageId, Icon: Users, label: "Team Travel", sub: "Flights & hotels" },
-  { page: "talk" as PageId, Icon: MessageCircle, label: "Podcast Talking Points", sub: "What to say" },
+  { page: "talk" as PageId, Icon: MessageCircle, label: "Talking Points Helper", sub: "What to say" },
   { page: "status" as PageId, Icon: Activity, label: "Team Status", sub: "Who's where" },
   { page: "loadin" as PageId, Icon: PackageOpen, label: "Load In", sub: "Marshalling & setup", anchor: "loadin" },
   { page: "loadin" as PageId, Icon: PackageCheck, label: "Load Out", sub: "Teardown", anchor: "loadout" },

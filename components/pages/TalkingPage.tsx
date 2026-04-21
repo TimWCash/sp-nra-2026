@@ -45,12 +45,6 @@ export function TalkingPage() {
 
       <Section icon={<ArrowRight size={16} />} title="Closing the Conversation" className="mt-6" />
       <TalkCard point={{ tag: "NEXT STEP", text: "Always end with a clear action: send a case study, book a follow-up call, or invite them to be a podcast guest. Scan their badge with lead retrieval and add a note immediately." }} />
-
-      <Section icon={<span className="text-base">&#129364;</span>} title="Mr. Potato Head" className="mt-6" />
-      <div className="rounded-xl p-4 text-sm leading-relaxed"
-        style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
-        Hide him somewhere different each day &mdash; creates a fun reason to come back. Or hide individual parts around the booth as a scavenger hunt. First to find all pieces wins a Joy of Ops mug.
-      </div>
     </div>
   )
 }

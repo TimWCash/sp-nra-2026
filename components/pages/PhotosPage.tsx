@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { Camera, Trash2, X, Loader2 } from "lucide-react"
+import { Camera, Trash2, X, Loader2, ImagePlus } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
 const TEAM_MEMBERS = ["Brian", "Rebecca", "Maria", "Steve", "Kelly", "Emily", "Ellis"] as const
@@ -38,9 +38,11 @@ function resizeImage(file: File, maxWidth: number): Promise<string> {
 export function PhotosPage() {
   const [photos, setPhotos] = useState<Photo[]>([])
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null)
   const [takenBy, setTakenBy] = useState("")
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const libraryInputRef = useRef<HTMLInputElement>(null)
 
   const fetchPhotos = useCallback(async () => {
     const { data } = await supabase.from("show_photos").select("*").order("created_at", { ascending: false })
@@ -68,22 +70,27 @@ export function PhotosPage() {
   }, [fetchPhotos])
 
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (fileInputRef.current) fileInputRef.current.value = ""
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = ""
+    if (files.length === 0) return
 
     setUploading(true)
+    setUploadProgress({ done: 0, total: files.length })
     try {
-      const resized = await resizeImage(file, 1200)
-      await supabase.from("show_photos").insert({
-        url: resized,
-        caption: "",
-        taken_by: takenBy,
-      })
+      for (let i = 0; i < files.length; i++) {
+        const resized = await resizeImage(files[i], 1200)
+        await supabase.from("show_photos").insert({
+          url: resized,
+          caption: "",
+          taken_by: takenBy,
+        })
+        setUploadProgress({ done: i + 1, total: files.length })
+      }
     } catch (err) {
       console.error("Photo upload error:", err)
     } finally {
       setUploading(false)
+      setUploadProgress(null)
     }
   }
 
@@ -114,16 +121,33 @@ export function PhotosPage() {
         ))}
       </div>
 
-      {/* Camera button */}
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        disabled={uploading}
-        className="w-full flex items-center justify-center gap-2 rounded-xl py-4 mb-5 font-bold text-[15px] cursor-pointer transition-all duration-200 active:scale-[0.98]"
-        style={{ background: "var(--accent)", color: "var(--accent-fg)", border: "none", opacity: uploading ? 0.7 : 1 }}>
-        {uploading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
-        {uploading ? "Uploading..." : "Take a Photo"}
-      </button>
-      <input ref={fileInputRef} type="file" accept="image/*" capture="environment"
+      {/* Capture + Upload buttons */}
+      <div className="flex gap-2 mb-5">
+        <button
+          onClick={() => cameraInputRef.current?.click()}
+          disabled={uploading}
+          className="flex-1 flex items-center justify-center gap-2 rounded-xl py-4 font-bold text-[15px] cursor-pointer transition-all duration-200 active:scale-[0.98] disabled:cursor-wait"
+          style={{ background: "var(--accent)", color: "var(--accent-fg)", border: "none", opacity: uploading ? 0.7 : 1 }}>
+          {uploading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+          {uploading
+            ? (uploadProgress ? `${uploadProgress.done}/${uploadProgress.total}` : "Uploading…")
+            : "Take Photo"}
+        </button>
+        <button
+          onClick={() => libraryInputRef.current?.click()}
+          disabled={uploading}
+          aria-label="Upload photos from camera roll"
+          className="flex-1 flex items-center justify-center gap-2 rounded-xl py-4 font-bold text-[15px] cursor-pointer transition-all duration-200 active:scale-[0.98] disabled:cursor-wait"
+          style={{ background: "var(--surface)", color: "var(--text)", border: "1.5px solid var(--border)", opacity: uploading ? 0.7 : 1 }}>
+          <ImagePlus size={18} />
+          From Library
+        </button>
+      </div>
+      {/* Camera-only input — forces rear camera */}
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment"
+        onChange={handlePhoto} className="hidden" />
+      {/* Library input — opens camera roll, supports multi-select */}
+      <input ref={libraryInputRef} type="file" accept="image/*" multiple
         onChange={handlePhoto} className="hidden" />
 
       {/* Grid */}
