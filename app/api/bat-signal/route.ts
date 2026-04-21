@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { pushStore } from "@/lib/pushStore"
+import { getAllSubscriptions, removeSubscription, countSubscriptions } from "@/lib/pushStore"
 import type { PushSubscription } from "web-push"
 
 let batSignalState = { active: false, since: 0 }
@@ -22,24 +22,39 @@ export async function POST(req: Request) {
   const vapidPrivate = process.env.VAPID_PRIVATE_KEY
   const vapidMailto = process.env.VAPID_MAILTO || "mailto:tim@servicephysics.com"
 
-  if (body.active && pushStore.size > 0 && vapidPublic && vapidPrivate) {
+  let pushed = 0
+  let failed = 0
+
+  if (body.active && vapidPublic && vapidPrivate) {
     try {
-      const webpush = (await import("web-push")).default
-      webpush.setVapidDetails(vapidMailto, vapidPublic, vapidPrivate)
-      const payload = JSON.stringify({
-        title: "🦇 BAT SIGNAL",
-        body: "Booth #7365 is SLAMMED — get back now!",
-      })
-      const sends = Array.from(pushStore.values()).map((sub) =>
-        webpush.sendNotification(sub as PushSubscription, payload).catch(() => {
-          pushStore.delete((sub as PushSubscription).endpoint)
+      const subs = await getAllSubscriptions()
+      if (subs.length > 0) {
+        const webpush = (await import("web-push")).default
+        webpush.setVapidDetails(vapidMailto, vapidPublic, vapidPrivate)
+        const payload = JSON.stringify({
+          title: "🦇 BAT SIGNAL",
+          body: "Booth #7365 is SLAMMED — get back now!",
         })
-      )
-      await Promise.all(sends)
+        const results = await Promise.allSettled(
+          subs.map((sub) =>
+            webpush.sendNotification(sub as PushSubscription, payload).catch(async (err) => {
+              const status = (err as { statusCode?: number } | null)?.statusCode ?? 0
+              // 404 / 410 = subscription is dead; prune it.
+              if (status === 404 || status === 410) {
+                await removeSubscription((sub as PushSubscription).endpoint)
+              }
+              throw err
+            })
+          )
+        )
+        pushed = results.filter((r) => r.status === "fulfilled").length
+        failed = results.filter((r) => r.status === "rejected").length
+      }
     } catch (err) {
       console.error("Push notification error:", err)
     }
   }
 
-  return NextResponse.json({ ...batSignalState, pushed: pushStore.size })
+  const total = await countSubscriptions().catch(() => 0)
+  return NextResponse.json({ ...batSignalState, pushed, failed, total })
 }

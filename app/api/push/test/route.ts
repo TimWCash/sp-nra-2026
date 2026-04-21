@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
-import { pushStore } from "@/lib/pushStore"
-import type { PushSubscription } from "web-push"
+import { getSubscription, removeSubscription } from "@/lib/pushStore"
 
 /**
  * Sends a single test push notification to the provided subscription endpoint.
@@ -26,7 +25,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const sub = pushStore.get(endpoint) as PushSubscription | undefined
+  const sub = await getSubscription(endpoint)
   if (!sub) {
     return NextResponse.json(
       { error: "Subscription not registered on server. Re-enable notifications and try again." },
@@ -47,7 +46,7 @@ export async function POST(req: Request) {
     // If the subscription is stale/expired, drop it so the client can re-subscribe.
     const status = (err as { statusCode?: number } | null)?.statusCode ?? 500
     if (status === 404 || status === 410) {
-      pushStore.delete(endpoint)
+      await removeSubscription(endpoint)
     }
     console.error("Test push error:", err)
     return NextResponse.json(
