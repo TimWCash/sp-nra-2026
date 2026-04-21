@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server"
+import { SERVICE_PHYSICS_LINKEDIN_STYLE } from "@/lib/linkedinStyle"
 
 /**
  * Turns session notes into a LinkedIn post draft via Claude.
  * Uses Haiku (cheapest tier) — this is a short-form generation task.
  * Configure by dropping ANTHROPIC_API_KEY into Vercel env vars.
+ *
+ * Voice + structure is controlled by lib/linkedinStyle.ts — edit that file
+ * to tune how drafts sound without touching this logic.
  */
 
 type Note = { author: string; content: string }
@@ -28,25 +32,25 @@ type Body = {
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5"
 
 const OPENER_GUIDES: Record<OpenerStyle, string> = {
-  stat: `Open by leading with a specific number or data point lifted from the notes. No throat-clearing, no "I attended…". Just the number and what it means.
-EXAMPLE OPENING (don't copy — use one FROM THE NOTES):
+  stat: `HOOK STYLE: lead with a specific number or data point lifted from the notes. No throat-clearing. Just the number and the tension inside it.
+Example flavor (don't copy — ground yours in the actual notes):
 "60% of operators are raising prices again in 2026. Most still can't tell you where the margin went."`,
 
-  scene: `Open by painting a short concrete scene from the room or the moment — something sensory or specific. Then pivot to the idea.
-EXAMPLE OPENING:
-"Room was packed. Standing room only. That tells you everything about where operators' heads are right now."`,
+  scene: `HOOK STYLE: open with a concrete moment from the room — sensory, specific, physical. Then pivot to what it means.
+Example flavor:
+"Room was packed. Standing-room only. That tells you everything about where operators' heads are right now."`,
 
-  contrarian: `Open by challenging a conventional assumption the session touched on. State the popular view, then push back on it using what you heard.
-EXAMPLE OPENING:
-"Everyone says cross-training solves retention. The speakers today made me wonder if we've been solving the wrong problem."`,
+  contrarian: `HOOK STYLE: challenge a conventional assumption. State the popular view in one line, then push back using what the notes say.
+Example flavor:
+"Everyone says cross-training solves retention. Today made me think we've been solving the wrong problem."`,
 
-  question: `Open with a pointed, specific question the session forced you to sit with. Not rhetorical fluff — a real question an operator would actually chew on.
-EXAMPLE OPENING:
+  question: `HOOK STYLE: open with a pointed, specific question a real operator would chew on. Not rhetorical fluff, not "what do you think?"
+Example flavor:
 "If your labor model breaks when one shift leader calls out, is it actually a model?"`,
 
-  observation: `Open with an unexpected thing you noticed — a pattern, a tension, a thing nobody else seems to be saying out loud. Specific, not generic.
-EXAMPLE OPENING:
-"Three different sessions today. Zero mention of the guest. That's its own data point."`,
+  observation: `HOOK STYLE: open with an unexpected pattern or tension nobody's saying out loud. Specific, not generic.
+Example flavor:
+"Three sessions today. Zero mention of the guest. That's its own data point."`,
 }
 
 const STYLE_CYCLE: OpenerStyle[] = ["stat", "scene", "contrarian", "question", "observation"]
@@ -79,62 +83,41 @@ export async function POST(req: Request) {
     )
   }
 
-  const tone = body.tone || "professional"
   const length = body.length || "medium"
   const openerStyle = pickStyle(body.openerStyle)
 
   const lengthGuide =
     length === "short"
-      ? "Keep it tight — 60-100 words. 1-2 short paragraphs."
-      : "Aim for 120-180 words. 2-3 short paragraphs."
-
-  const toneGuide =
-    tone === "casual"
-      ? "Write in a casual, conversational tone. First person. No corporate speak."
-      : tone === "punchy"
-        ? "Write punchy and direct. Short sentences. Confident. A little opinionated is fine."
-        : "Write in a professional but human tone. First person. No jargon, no hashtag soup."
+      ? "Target length: 60-100 words. 1-2 short paragraphs plus hashtags."
+      : "Target length: 120-180 words. 2-3 short paragraphs plus hashtags."
 
   const notesBlock = cleaned
     .map((n) => `- ${n.author ? `[${n.author}] ` : ""}${n.content}`)
     .join("\n")
 
-  const system = `You are a writing assistant for a restaurant-operations consulting firm called Service Physics. Your job is to turn raw notes from a team member attending an NRA Show 2026 session into a LinkedIn post draft written from that attendee's first-person perspective.
+  const system = `You are drafting a LinkedIn post for Service Physics, a restaurant-operations consulting firm, based on raw notes from a team member who attended a session at NRA Show 2026. Write from that attendee's first-person perspective, in Service Physics' proven voice.
 
-Hard rules:
-- The post is a DRAFT. Someone will edit it before publishing.
-- Ground EVERYTHING in the notes. Do NOT invent stats, quotes, speaker names, or session details that aren't in the notes.
-- If the notes are thin, lean into the one specific thing that stood out. Don't pad with generic industry commentary.
-- Pull out 1-2 concrete takeaways a restaurant operator would actually care about (labor, ops, guest experience, speed of service, margin).
-- End with ONE soft, specific question inviting a real reply. Not "drop a 🚀", not "what do you think?" — something pointed.
-- Do NOT use hashtags.
-- Do NOT wrap the output in quotes or say "Here's a draft". Output only the post body.
+Follow this style guide EXACTLY:
 
-BANNED opening patterns — these are LinkedIn clichés, do NOT use any variation of them:
-- "Just sat through…"
-- "Just wrapped up…"
-- "Just attended…"
-- "Had the pleasure of attending…"
-- "Key takeaway from…"
-- "Three takeaways from today's session on…"
-- "Attended a great session today on…"
-- "What a session!"
-- Any opener that names the conference/session in the first sentence.
+${SERVICE_PHYSICS_LINKEDIN_STYLE}
 
-The first 10 words of your post are the most important thing in the whole piece. Make them stop the scroll.`
+Additional rules specific to session-notes drafts:
+- Ground EVERYTHING in the notes. Do NOT invent stats, quotes, speaker names, or details that aren't in the notes.
+- If the notes are thin, lean into the ONE specific thing that stood out. Don't pad with generic industry commentary.
+- The post is a DRAFT — someone will edit it before publishing. But hand them something strong, not a scaffold.
+- Do NOT wrap the output in quotes. Do NOT say "Here's a draft:". Output ONLY the post body (including hashtags at the end).`
 
   const user = `Session: ${body.sessionTitle || "(unknown)"}
 ${body.sessionCategory ? `Category: ${body.sessionCategory}\n` : ""}${body.sessionLocation ? `Location: ${body.sessionLocation}\n` : ""}${body.sessionDay ? `Day: ${body.sessionDay}\n` : ""}
 Notes from the team member(s) who attended:
 ${notesBlock}
 
-${toneGuide}
 ${lengthGuide}
 
-OPENING STYLE for this draft: ${openerStyle.toUpperCase()}
+For THIS draft, use this opening style: ${openerStyle.toUpperCase()}
 ${OPENER_GUIDES[openerStyle]}
 
-Now write the LinkedIn post. Grounded in the notes. No clichés. Make the first line earn attention.`
+Now write the LinkedIn post. Follow the Hook → Story → Insight → Ending structure. Sound like Steve. Ground every detail in the notes. End with a line that sticks — not a question, not a pitch. Finish with 3-5 relevant hashtags.`
 
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
