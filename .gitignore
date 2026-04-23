@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# stray local documents — invoices, COIs, etc. left in the project root
+*.PDF
+*.pdf
