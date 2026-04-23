@@ -24,9 +24,9 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 const CACHE_KEY = "sp_nra_leads_cache"
 const PENDING_KEY = "sp_nra_leads_pending_supabase"
 
-// Data we queue for the Supabase insert. This is the full Lead object plus the
-// raw input so we can re-insert with the same client-side id on retry.
-export interface PendingLead extends Lead {}
+// Data we queue for the Supabase insert. Alias of Lead today; separate name so
+// callers can distinguish "in-memory UI lead" from "lead awaiting server write."
+export type PendingLead = Lead
 
 function safeParse<T>(raw: string | null, fallback: T): T {
   if (!raw) return fallback

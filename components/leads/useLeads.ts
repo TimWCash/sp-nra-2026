@@ -91,13 +91,26 @@ export function useLeads() {
   }, [fetchLeads, refreshPendingCount])
 
   // On mount & when reconnecting: first flush queued Supabase inserts, then
-  // drain the Sheets-sync queue. Order matters — a lead has to exist in
-  // Supabase before we mirror it to the Sheet.
+  // mirror the leads that JUST landed to the Sheet, then drain any pre-existing
+  // Sheets-sync queue. Order matters — a lead has to exist in Supabase before
+  // we mirror it to the Sheet, and leads captured offline never went through
+  // syncLead once, so we have to trigger it here.
   useEffect(() => {
     const flush = async () => {
       if (getPendingSupabaseCount() > 0) {
+        // Snapshot queue BEFORE draining so we know which leads newly landed.
+        const snapshot = getPendingLeadsOffline()
         const n = await flushPendingSupabase(supabase)
-        if (n > 0) await fetchLeads()
+        if (n > 0) {
+          await fetchLeads()
+          // Find the ones that successfully left the queue and push them to
+          // Sheets. syncLead is idempotent — already-synced ids short-circuit.
+          const stillQueued = new Set(getPendingLeadsOffline().map((p) => p.id))
+          const justLanded = snapshot.filter((p) => !stillQueued.has(p.id))
+          for (const lead of justLanded) {
+            syncLead(lead).catch(() => { /* queues internally on failure */ })
+          }
+        }
       }
       if (getPendingCount() > 0) {
         await syncPending()
