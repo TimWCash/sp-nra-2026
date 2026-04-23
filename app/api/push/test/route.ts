@@ -43,14 +43,19 @@ export async function POST(req: Request) {
     await webpush.sendNotification(sub, payload)
     return NextResponse.json({ ok: true })
   } catch (err) {
-    // If the subscription is stale/expired, drop it so the client can re-subscribe.
     const status = (err as { statusCode?: number } | null)?.statusCode ?? 500
+    console.error("Test push error:", err)
+    // Subscription is dead on the platform side (APNS/FCM). Drop it and tell
+    // the client so it can unsubscribe locally + re-subscribe cleanly.
     if (status === 404 || status === 410) {
       await removeSubscription(endpoint)
+      return NextResponse.json(
+        { error: "Push subscription expired. Refreshing…", expired: true },
+        { status: 410 }
+      )
     }
-    console.error("Test push error:", err)
     return NextResponse.json(
-      { error: "Could not deliver push — the subscription may have expired. Re-enable notifications." },
+      { error: "Could not deliver push. Try again in a moment." },
       { status: 500 }
     )
   }

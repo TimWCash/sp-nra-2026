@@ -36,17 +36,30 @@ function detectStandalone(): boolean {
   return iosStandalone || mediaStandalone
 }
 
-async function subscribeToPush(): Promise<PushSubscription | null> {
+async function subscribeToPush(opts: { forceFresh?: boolean } = {}): Promise<PushSubscription | null> {
   if (!("serviceWorker" in navigator) || !VAPID_PUBLIC_KEY) return null
   const reg = await navigator.serviceWorker.ready
   const existing = await reg.pushManager.getSubscription()
-  if (existing) {
+  if (existing && !opts.forceFresh) {
     await fetch("/api/push/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(existing.toJSON()),
     })
     return existing
+  }
+  // forceFresh: drop the dead local sub first, then create a new one. Tell
+  // the server about the removal too so it doesn't keep pushing to a dead endpoint.
+  if (existing && opts.forceFresh) {
+    const deadEndpoint = existing.endpoint
+    try { await existing.unsubscribe() } catch {}
+    try {
+      await fetch("/api/push/subscribe", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: deadEndpoint }),
+      })
+    } catch {}
   }
   const sub = await reg.pushManager.subscribe({
     userVisibleOnly: true,
@@ -118,26 +131,47 @@ export function SetupPage() {
     }
   }
 
+  async function pingTest(endpoint: string): Promise<{ ok: boolean; expired?: boolean; error?: string; status: number }> {
+    const res = await fetch("/api/push/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint }),
+    })
+    const json = await res.json().catch(() => ({}))
+    return { ok: res.ok, expired: !!json.expired, error: json.error, status: res.status }
+  }
+
   async function sendTestSignal() {
     setTestState("sending")
     setTestError(null)
     try {
       const reg = await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.getSubscription()
+      let sub = await reg.pushManager.getSubscription()
       if (!sub) {
         setTestState("error")
         setTestError("No push subscription — enable notifications first.")
         return
       }
-      const res = await fetch("/api/push/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ endpoint: sub.endpoint }),
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) {
+
+      let result = await pingTest(sub.endpoint)
+
+      // Auto-recover: if the server says the subscription expired, refresh the
+      // local sub (unsubscribe + re-subscribe + re-register) and retry once.
+      if (!result.ok && result.expired) {
+        const fresh = await subscribeToPush({ forceFresh: true })
+        if (!fresh) {
+          setTestState("error")
+          setTestError("Couldn't refresh your subscription. Toggle notifications off and on in Settings, then retry.")
+          return
+        }
+        sub = fresh
+        setHasPushSub(true)
+        result = await pingTest(sub.endpoint)
+      }
+
+      if (!result.ok) {
         setTestState("error")
-        setTestError(json.error || `Push failed (${res.status})`)
+        setTestError(result.error || `Push failed (${result.status})`)
         return
       }
       setTestState("sent")
