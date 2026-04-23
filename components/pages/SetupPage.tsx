@@ -131,14 +131,26 @@ export function SetupPage() {
     }
   }
 
-  async function pingTest(endpoint: string): Promise<{ ok: boolean; expired?: boolean; error?: string; status: number }> {
+  async function pingTest(endpoint: string): Promise<{
+    ok: boolean
+    expired?: boolean
+    error?: string
+    status: number
+    upstreamStatus?: number
+  }> {
     const res = await fetch("/api/push/test", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ endpoint }),
     })
     const json = await res.json().catch(() => ({}))
-    return { ok: res.ok, expired: !!json.expired, error: json.error, status: res.status }
+    return {
+      ok: res.ok,
+      expired: !!json.expired,
+      error: json.error,
+      status: res.status,
+      upstreamStatus: typeof json.upstreamStatus === "number" ? json.upstreamStatus : undefined,
+    }
   }
 
   async function sendTestSignal() {

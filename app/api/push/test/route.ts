@@ -43,19 +43,56 @@ export async function POST(req: Request) {
     await webpush.sendNotification(sub, payload)
     return NextResponse.json({ ok: true })
   } catch (err) {
-    const status = (err as { statusCode?: number } | null)?.statusCode ?? 500
-    console.error("Test push error:", err)
-    // Subscription is dead on the platform side (APNS/FCM). Drop it and tell
-    // the client so it can unsubscribe locally + re-subscribe cleanly.
-    if (status === 404 || status === 410) {
+    const e = err as { statusCode?: number; body?: string; headers?: Record<string, string> } | null
+    const status = e?.statusCode ?? 500
+    const body = typeof e?.body === "string" ? e.body.slice(0, 400) : undefined
+    // Log the full shape so we can actually diagnose production pushes failing.
+    console.error("Test push error:", {
+      status,
+      body,
+      endpoint: endpoint.slice(0, 80),
+      message: err instanceof Error ? err.message : String(err),
+    })
+
+    // 404/410: gone. APNS/FCM have forgotten this endpoint. Re-subscribe will fix it.
+    // 400/403: also commonly fixed by re-subscribing — 400 can mean stale/malformed
+    // subscription state on the platform side, 403 can mean a VAPID identifier mismatch
+    // that gets re-issued with the fresh sub. Treat them all as "refresh and retry."
+    if (status === 400 || status === 403 || status === 404 || status === 410) {
       await removeSubscription(endpoint)
       return NextResponse.json(
-        { error: "Push subscription expired. Refreshing…", expired: true },
+        {
+          error: "Push subscription expired. Refreshing…",
+          expired: true,
+          detail: body,
+          upstreamStatus: status,
+        },
         { status: 410 }
       )
     }
+    // 413 — payload too big. We never send big payloads in the test, so this would
+    // mean APNS is extra-picky today. Tell the user, don't auto-retry.
+    if (status === 413) {
+      return NextResponse.json(
+        { error: "Push payload rejected as too large. Tell Tim." },
+        { status: 413 }
+      )
+    }
+    // 429 — rate limit. Backoff and retry later.
+    if (status === 429) {
+      return NextResponse.json(
+        { error: "Push service is rate-limiting us. Wait 30s and try again." },
+        { status: 429 }
+      )
+    }
+    // Fallthrough: include upstream status in the UI so teammates can screenshot
+    // something useful instead of a generic "try again."
     return NextResponse.json(
-      { error: "Could not deliver push. Try again in a moment." },
+      {
+        error: `Push delivery failed (${status}). Tap again to auto-refresh your subscription.`,
+        detail: body,
+        upstreamStatus: status,
+      },
       { status: 500 }
     )
   }

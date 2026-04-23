@@ -7,13 +7,14 @@ import { LeadForm } from "@/components/leads/LeadForm"
 import { LeadCard } from "@/components/leads/LeadCard"
 
 const CAPTURED_BY_KEY = "sp_nra_captured_by"
+const TEAM_GOAL = 50
 type FilterKey = "all" | "mine" | "hot" | "warm" | "cool" | "followUp"
 
 export function LeadsPage() {
   const {
     leads, stats, leaderboard, addLead, deleteLead, toggleFollowUp,
     clearAll, exportCSV, emailLeads, copyAll,
-    syncStatus, pendingCount, isSyncing, syncNow, backfillToSheet,
+    syncStatus, pendingCount, pendingSupabase, isSyncing, syncNow, backfillToSheet,
   } = useLeads()
   const [formOpen, setFormOpen] = useState(false)
   const [copyLabel, setCopyLabel] = useState("Copy All")
@@ -111,6 +112,21 @@ export function LeadsPage() {
         </button>
       </div>
 
+      {pendingSupabase > 0 && (
+        <div className="rounded-xl p-3 mb-3 flex items-start gap-2 text-[12px]"
+          style={{ background: "var(--amber-light)", color: "var(--amber)", border: "1px solid var(--amber)" }}>
+          <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+          <div>
+            <div className="font-bold mb-0.5">
+              {pendingSupabase} lead{pendingSupabase === 1 ? "" : "s"} waiting to sync
+            </div>
+            <div className="opacity-90">
+              Saved on your phone. We&apos;ll push {pendingSupabase === 1 ? "it" : "them"} up automatically when you&apos;re back on Wi-Fi or service.
+            </div>
+          </div>
+        </div>
+      )}
+
       {stats.total > 0 && (
         <>
           {/* Stats row */}
@@ -121,6 +137,35 @@ export function LeadsPage() {
             <span style={{ color: "var(--accent)" }}>{stats.cool} cool</span>
             {stats.followUp > 0 && <> &middot; <span style={{ color: "var(--amber)" }}>⚑ {stats.followUp} to follow up</span></>}
           </div>
+
+          {/* Team Goal: 50 leads */}
+          {(() => {
+            const pct = Math.min(100, Math.round((stats.total / TEAM_GOAL) * 100))
+            const hit = stats.total >= TEAM_GOAL
+            return (
+              <div className="rounded-xl p-3.5 mb-3"
+                style={{ background: "var(--surface)", border: `1px solid ${hit ? "var(--success)" : "var(--border)"}` }}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Trophy size={13} style={{ color: hit ? "var(--success)" : "var(--amber)" }} />
+                    <span className="text-[12px] font-bold" style={{ color: "var(--text)" }}>
+                      Team Goal {hit ? "— hit 🎉" : ""}
+                    </span>
+                  </div>
+                  <span className="text-[12px] font-bold" style={{ color: hit ? "var(--success)" : "var(--accent)" }}>
+                    {stats.total} / {TEAM_GOAL}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--surface-alt)" }}>
+                  <div className="h-full transition-all duration-500"
+                    style={{
+                      width: `${pct}%`,
+                      background: hit ? "var(--success)" : "var(--accent)",
+                    }} />
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Leaderboard toggle */}
           <button

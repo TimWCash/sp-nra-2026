@@ -3,6 +3,16 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { supabase } from "@/lib/supabase"
 import { syncLead, syncPending, getPendingCount, computeSyncStatus, type SyncStatus } from "@/lib/sheets-sync"
+import {
+  cacheLeads,
+  loadCachedLeads,
+  queueLead,
+  dequeueLead,
+  insertLead,
+  flushPending as flushPendingSupabase,
+  getPendingCount as getPendingSupabaseCount,
+  getPendingLeads as getPendingLeadsOffline,
+} from "@/lib/leads-offline"
 
 export type HeatLevel = "hot" | "warm" | "cool"
 
@@ -39,14 +49,16 @@ function dbRowToLead(row: Record<string, unknown>): Lead {
 }
 
 export function useLeads() {
-  const [leads, setLeads] = useState<Lead[]>([])
+  const [leads, setLeads] = useState<Lead[]>(() => loadCachedLeads())
   const [loading, setLoading] = useState(true)
   const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set())
   const [pendingCount, setPendingCountState] = useState(0)
+  const [pendingSupabase, setPendingSupabase] = useState(0)
   const [isBackfilling, setIsBackfilling] = useState(false)
 
   const refreshPendingCount = useCallback(() => {
     setPendingCountState(getPendingCount())
+    setPendingSupabase(getPendingSupabaseCount())
   }, [])
 
   const fetchLeads = useCallback(async () => {
@@ -55,7 +67,16 @@ export function useLeads() {
       .select("*")
       .order("created_at", { ascending: false })
 
-    if (!error && data) setLeads(data.map(dbRowToLead))
+    if (!error && data) {
+      const fetched = data.map(dbRowToLead)
+      // Merge in any still-pending local leads so they don't disappear from
+      // the UI while waiting to reach Supabase.
+      const pendingIds = new Set(fetched.map((l) => l.id))
+      const pendingLocal = getPendingLeadsOffline().filter((p) => !pendingIds.has(p.id))
+      const merged = [...pendingLocal, ...fetched]
+      setLeads(merged)
+      cacheLeads(merged)
+    }
     setLoading(false)
   }, [])
 
@@ -69,53 +90,80 @@ export function useLeads() {
     return () => { supabase.removeChannel(channel) }
   }, [fetchLeads, refreshPendingCount])
 
-  // On mount & when reconnecting, attempt to flush any queued leads
+  // On mount & when reconnecting: first flush queued Supabase inserts, then
+  // drain the Sheets-sync queue. Order matters — a lead has to exist in
+  // Supabase before we mirror it to the Sheet.
   useEffect(() => {
     const flush = async () => {
-      if (getPendingCount() === 0) return
-      await syncPending()
+      if (getPendingSupabaseCount() > 0) {
+        const n = await flushPendingSupabase(supabase)
+        if (n > 0) await fetchLeads()
+      }
+      if (getPendingCount() > 0) {
+        await syncPending()
+      }
       refreshPendingCount()
     }
     flush()
     window.addEventListener("online", flush)
     return () => window.removeEventListener("online", flush)
-  }, [refreshPendingCount])
+  }, [fetchLeads, refreshPendingCount])
 
   const addLead = useCallback(async (data: Omit<Lead, "id" | "time">) => {
-    const { data: inserted, error } = await supabase
-      .from("nra_leads")
-      .insert({
-        name: data.name,
-        company: data.company || "",
-        role: data.role || "",
-        contact: data.contact || "",
-        notes: data.notes || "",
-        heat: data.heat,
-        badge_photo: data.badgePhoto || "",
-        captured_by: data.capturedBy || "",
-        follow_up: false,
-      })
-      .select()
-      .single()
+    // Client-side id + timestamp so the lead is durable from the moment the
+    // user taps Save, regardless of connectivity. Retries stay idempotent
+    // because we upsert by this id.
+    const id = (typeof crypto !== "undefined" && "randomUUID" in crypto)
+      ? crypto.randomUUID()
+      : `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const now = new Date()
+    const lead: Lead = {
+      id,
+      name: data.name,
+      company: data.company || "",
+      role: data.role || "",
+      contact: data.contact || "",
+      notes: data.notes || "",
+      heat: data.heat,
+      time: now.toLocaleString("en-US", {
+        month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true,
+      }),
+      badgePhoto: data.badgePhoto,
+      capturedBy: data.capturedBy,
+      followUp: false,
+    }
 
-    if (error || !inserted) return
+    // 1. Optimistic local state — user sees the lead immediately, even offline.
+    setLeads((prev) => [lead, ...prev.filter((l) => l.id !== lead.id)])
+    cacheLeads([lead, ...loadCachedLeads().filter((l) => l.id !== lead.id)])
 
-    const lead = dbRowToLead(inserted as Record<string, unknown>)
+    // 2. Queue the Supabase write. Dequeue only on success.
+    queueLead(lead)
+    refreshPendingCount()
 
-    // Fire-and-forget sync to Google Sheet. Failures queue in localStorage.
-    setSyncingIds((prev) => {
-      const next = new Set(prev)
-      next.add(lead.id)
-      return next
-    })
-    syncLead(lead).finally(() => {
+    const insertedOk = await insertLead(supabase, lead)
+    if (insertedOk) {
+      dequeueLead(lead.id)
+      refreshPendingCount()
+      // 3. Mirror to Google Sheet. On failure, the Sheets sync module queues
+      //    the lead in its own localStorage bucket.
       setSyncingIds((prev) => {
         const next = new Set(prev)
-        next.delete(lead.id)
+        next.add(lead.id)
         return next
       })
-      refreshPendingCount()
-    })
+      syncLead(lead).finally(() => {
+        setSyncingIds((prev) => {
+          const next = new Set(prev)
+          next.delete(lead.id)
+          return next
+        })
+        refreshPendingCount()
+      })
+    }
+    // If Supabase failed, the lead stays in the pending queue and will be
+    // retried on the next "online" event or component mount. The Sheets sync
+    // will happen then too.
   }, [refreshPendingCount])
 
   const deleteLead = useCallback(async (id: string) => {
@@ -250,6 +298,7 @@ export function useLeads() {
     copyAll,
     syncStatus,
     pendingCount,
+    pendingSupabase,
     isSyncing,
     syncNow,
     backfillToSheet,
