@@ -39,10 +39,20 @@ export async function POST(req: Request) {
           subs.map((sub) =>
             webpush.sendNotification(sub as PushSubscription, payload).catch(async (err) => {
               const status = (err as { statusCode?: number } | null)?.statusCode ?? 0
-              // 404 / 410 = subscription is dead; prune it.
-              if (status === 404 || status === 410) {
+              // 400/403/404/410 = subscription is effectively dead. Prune it so it
+              // doesn't keep bouncing on every bat signal. (400/403 are usually stale
+              // VAPID pairings; the next time that person opens the app the drift
+              // detector in SetupPage re-subscribes them cleanly.)
+              if (status === 400 || status === 403 || status === 404 || status === 410) {
                 await removeSubscription((sub as PushSubscription).endpoint)
               }
+              // Log per-failure so we can spot patterns (e.g. every sub failing 403 =
+              // VAPID keys drifted, needs an env fix, not an auto-heal).
+              console.error("Bat-signal push failed:", {
+                status,
+                endpoint: (sub as PushSubscription).endpoint.slice(0, 80),
+                message: err instanceof Error ? err.message : String(err),
+              })
               throw err
             })
           )

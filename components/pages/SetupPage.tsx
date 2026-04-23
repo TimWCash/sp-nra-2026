@@ -8,6 +8,13 @@ import {
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""
 
+// Stored client-side the moment a subscription is created. If the public key
+// in the env changes (e.g. Tim rotates VAPID keys in Vercel), every teammate's
+// existing subscription becomes cryptographically mismatched with the server's
+// private key — pushes to them will return 403 forever. We detect the drift on
+// the next app open and silently re-subscribe.
+const VAPID_KEY_STAMP_KEY = "sp_vapid_public_key"
+
 type Platform = "ios" | "android" | "desktop" | "unknown"
 type TestState = "idle" | "sending" | "sent" | "error"
 type NotifState = NotificationPermission | "unsupported"
@@ -46,6 +53,7 @@ async function subscribeToPush(opts: { forceFresh?: boolean } = {}): Promise<Pus
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(existing.toJSON()),
     })
+    try { localStorage.setItem(VAPID_KEY_STAMP_KEY, VAPID_PUBLIC_KEY) } catch {}
     return existing
   }
   // forceFresh: drop the dead local sub first, then create a new one. Tell
@@ -70,7 +78,37 @@ async function subscribeToPush(opts: { forceFresh?: boolean } = {}): Promise<Pus
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(sub.toJSON()),
   })
+  try { localStorage.setItem(VAPID_KEY_STAMP_KEY, VAPID_PUBLIC_KEY) } catch {}
   return sub
+}
+
+/**
+ * VAPID drift check. If the public key this device subscribed with isn't the
+ * same as the one the server is now signing against, the subscription will
+ * 403 on every push. Silently refresh it before that happens.
+ *
+ * Runs at most once per app open, early — before a bat signal could fire.
+ * No user prompt, no permission dance — the browser reuses the already-granted
+ * Notification permission to mint a fresh subscription.
+ */
+async function healVapidDrift(): Promise<boolean> {
+  if (typeof window === "undefined") return false
+  if (!("serviceWorker" in navigator) || !VAPID_PUBLIC_KEY) return false
+  if (Notification.permission !== "granted") return false
+  try {
+    const reg = await navigator.serviceWorker.ready
+    const existing = await reg.pushManager.getSubscription()
+    if (!existing) return false
+    const stamped = localStorage.getItem(VAPID_KEY_STAMP_KEY)
+    if (stamped && stamped === VAPID_PUBLIC_KEY) return false // already current
+    // Either we've never stamped (legacy sub from before this code shipped) or
+    // the key rotated. Refresh silently.
+    await subscribeToPush({ forceFresh: true })
+    return true
+  } catch (err) {
+    console.warn("VAPID drift heal failed:", err)
+    return false
+  }
 }
 
 export function SetupPage() {
@@ -94,6 +132,9 @@ export function SetupPage() {
     setNotifPermission(Notification.permission)
 
     try {
+      // Heal any VAPID drift BEFORE we report hasPushSub, so the "✅ ready"
+      // state reflects a sub that will actually work.
+      await healVapidDrift()
       const reg = await navigator.serviceWorker.ready
       const sub = await reg.pushManager.getSubscription()
       setHasPushSub(!!sub)
@@ -179,6 +220,19 @@ export function SetupPage() {
         sub = fresh
         setHasPushSub(true)
         result = await pingTest(sub.endpoint)
+
+        // If the fresh subscription ALSO gets rejected with the same expired
+        // flag, we're not looking at a stale sub — the VAPID keypair on the
+        // server is busted. No amount of re-subscribing will fix that. Tell
+        // the user something actionable.
+        if (!result.ok && result.expired) {
+          setTestState("error")
+          setTestError(
+            `Server is rejecting every push subscription (${result.upstreamStatus ?? "???"}). ` +
+            `This is almost always a VAPID key mismatch — flag Tim to check NEXT_PUBLIC_VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY on Vercel.`
+          )
+          return
+        }
       }
 
       if (!result.ok) {
