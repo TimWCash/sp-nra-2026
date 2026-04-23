@@ -27,7 +27,7 @@ export const schedule: Record<string, ScheduleEvent[]> = {
     { time: "9:30am", title: "SHOW FLOOR OPENS", sub: "Booth #7365 \u00b7 Full team on floor", highlight: "open" },
     { time: "All Day", title: "Booth Staffing + Podcast", sub: "Track all conversations with lead retrieval app" },
     { time: "All Day", title: "Walk the show floor", sub: "Check out neighbors \u00b7 attend key sessions" },
-    { time: "3:00pm", title: "2027 Booth Selection \u2014 Brian + Rebecca", sub: "Session #28 \u00b7 Room S-401 (South Bldg, Level 4 \u2014 escalator from Grand Concourse) \u00b7 Arrive 10\u201315 min early \u00b7 Bring top 5 booth picks from the live floorplan (BLUE = available) \u00b7 5 min max in the room \u00b7 Decide together \u2014 no running back to the booth", highlight: "open" },
+    { time: "3:00pm", title: "2027 Booth Selection \u2014 Brian + Steve + Rebecca", sub: "Session #28 \u00b7 Room S-401 (South Bldg, Level 4 \u2014 escalator from Grand Concourse) \u00b7 Arrive 10\u201315 min early \u00b7 Bring top 5 booth picks from the live floorplan (BLUE = available) \u00b7 5 min max in the room \u00b7 Decide together \u2014 no running back to the booth", highlight: "open" },
     { time: "5:00pm", title: "Show Floor Closes", highlight: "close" },
     { time: "Evening", title: "Daily Debrief", sub: "Adjust for tomorrow. Log leads. Restock collateral." },
   ],
