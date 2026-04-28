@@ -108,9 +108,12 @@ export async function insertLead(
   supabase: SupabaseClient,
   lead: Lead,
 ): Promise<boolean> {
-  // upsert by id so a retried offline insert can't produce duplicates if the
-  // row somehow got through a previous attempt.
-  const { error } = await supabase.from("nra_leads").upsert(toRow(lead), { onConflict: "id" })
+  // upsert by id with ignoreDuplicates so a retried offline insert can't
+  // produce duplicates if the row somehow got through a previous attempt,
+  // and so we don't accidentally do an UPDATE under tighter RLS.
+  const { error } = await supabase
+    .from("nra_leads")
+    .upsert(toRow(lead), { onConflict: "id", ignoreDuplicates: true })
   return !error
 }
 

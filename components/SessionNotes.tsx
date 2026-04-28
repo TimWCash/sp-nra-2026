@@ -1,9 +1,19 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Sparkles, Send, Trash2, Loader2, User, Copy, CheckCircle2, X, RefreshCw } from "lucide-react"
+import { Sparkles, Send, Trash2, Loader2, User, Copy, CheckCircle2, X, RefreshCw, CloudOff } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { team as teamData } from "@/lib/data"
+import {
+  loadCachedNotes,
+  mergeAndCacheNotes,
+  queueNote,
+  dequeueNote,
+  insertNote,
+  flushPending,
+  getPendingCountForSession,
+  type Note as OfflineNote,
+} from "@/lib/notes-offline"
 
 const USER_NAME_KEY = "sp_user_name"
 
@@ -17,14 +27,7 @@ const STYLE_LABEL: Record<OpenerStyle, string> = {
   observation: "Unexpected observation",
 }
 
-type Note = {
-  id: string
-  session_title: string
-  session_day: string
-  author: string
-  content: string
-  created_at: string
-}
+type Note = OfflineNote
 
 type Props = {
   sessionTitle: string
@@ -54,12 +57,20 @@ function timeAgo(iso: string): string {
 }
 
 export function SessionNotes({ sessionTitle, sessionDay, sessionCategory, sessionLocation }: Props) {
-  const [notes, setNotes] = useState<Note[]>([])
+  // Hydrate from the local cache so the list renders immediately, even offline.
+  const [notes, setNotes] = useState<Note[]>(() =>
+    loadCachedNotes().filter((n) => n.session_day === sessionDay && n.session_title === sessionTitle)
+  )
   const [loading, setLoading] = useState(true)
   const [userName, setUserName] = useState("")
   const [askingName, setAskingName] = useState(false)
   const [draft, setDraft] = useState("")
   const [saving, setSaving] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
+
+  const refreshPendingCount = useCallback(() => {
+    setPendingCount(getPendingCountForSession(sessionDay, sessionTitle))
+  }, [sessionDay, sessionTitle])
 
   // LinkedIn draft modal state
   const [showDraft, setShowDraft] = useState(false)
@@ -81,16 +92,20 @@ export function SessionNotes({ sessionTitle, sessionDay, sessionCategory, sessio
     const { data, error } = await supabase
       .from("session_notes")
       .select("*")
-      .eq("session_day", sessionDay)
-      .eq("session_title", sessionTitle)
       .order("created_at", { ascending: false })
-    if (!error && data) setNotes(data as Note[])
+    if (!error && data) {
+      // Merge fresh server rows with locally-pending notes (so a still-queued
+      // offline note doesn't vanish from the UI on a fetch refresh).
+      const merged = mergeAndCacheNotes(data as Note[])
+      setNotes(merged.filter((n) => n.session_day === sessionDay && n.session_title === sessionTitle))
+    }
     setLoading(false)
   }, [sessionDay, sessionTitle])
 
   // Load + live-sync notes for this session.
   useEffect(() => {
     fetchNotes()
+    refreshPendingCount()
     const channel = supabase
       .channel(`notes-${sessionDay}-${sessionTitle}`)
       .on(
@@ -106,30 +121,67 @@ export function SessionNotes({ sessionTitle, sessionDay, sessionCategory, sessio
       )
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [sessionDay, sessionTitle, fetchNotes])
+  }, [sessionDay, sessionTitle, fetchNotes, refreshPendingCount])
+
+  // On mount + reconnect: flush any queued offline notes for ANY session,
+  // then refresh this session's view if anything landed.
+  useEffect(() => {
+    const flush = async () => {
+      const n = await flushPending(supabase)
+      if (n > 0) await fetchNotes()
+      refreshPendingCount()
+    }
+    flush()
+    window.addEventListener("online", flush)
+    return () => window.removeEventListener("online", flush)
+  }, [fetchNotes, refreshPendingCount])
 
   async function saveNote() {
     const content = draft.trim()
     if (!content) return
     if (!userName) { setAskingName(true); return }
     setSaving(true)
-    const { error } = await supabase.from("session_notes").insert({
+
+    // Client-side id + timestamp so the note is durable from the moment Save
+    // is tapped, regardless of connectivity. Idempotent retries via upsert by id.
+    const id = (typeof crypto !== "undefined" && "randomUUID" in crypto)
+      ? crypto.randomUUID()
+      : `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const note: Note = {
+      id,
       session_title: sessionTitle,
       session_day: sessionDay,
       author: userName,
       content,
-    })
-    setSaving(false)
-    if (!error) {
-      setDraft("")
-      fetchNotes()
+      created_at: new Date().toISOString(),
     }
+
+    // 1. Optimistic local state — note appears immediately even offline.
+    setNotes((prev) => [note, ...prev.filter((n) => n.id !== note.id)])
+    setDraft("")
+
+    // 2. Queue the Supabase write before attempting it. Dequeue on success.
+    queueNote(note)
+    refreshPendingCount()
+
+    const ok = await insertNote(supabase, note)
+    if (ok) {
+      dequeueNote(note.id)
+      refreshPendingCount()
+    }
+    // If insert failed, the note stays in the pending queue and will be
+    // retried on the next "online" event or component mount.
+    setSaving(false)
   }
 
   async function deleteNote(id: string) {
     if (!confirm("Delete this note? (Can't undo.)")) return
     // Optimistic
     setNotes((prev) => prev.filter((n) => n.id !== id))
+    // Pull from the pending queue too — otherwise a deleted-while-offline note
+    // would reappear once the queue flushed on reconnect.
+    dequeueNote(id)
+    refreshPendingCount()
     await supabase.from("session_notes").delete().eq("id", id)
   }
 
@@ -188,8 +240,18 @@ export function SessionNotes({ sessionTitle, sessionDay, sessionCategory, sessio
 
   return (
     <div className="mt-6">
-      <div className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: "var(--text-muted)" }}>
-        Team Notes
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[11px] font-bold tracking-widest uppercase" style={{ color: "var(--text-muted)" }}>
+          Team Notes
+        </div>
+        {pendingCount > 0 && (
+          <div className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+            style={{ background: "var(--amber-light)", color: "var(--amber)", border: "1px solid var(--amber)" }}
+            title="Saved on your phone, will sync when you're back online">
+            <CloudOff size={10} />
+            {pendingCount} offline
+          </div>
+        )}
       </div>
 
       {/* New-note input */}
