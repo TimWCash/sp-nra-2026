@@ -27,8 +27,17 @@ export async function POST(req: Request) {
 
   const sub = await getSubscription(endpoint)
   if (!sub) {
+    // The browser has a sub but our DB doesn't — usually because the server
+    // was unreachable (Supabase paused, network blip) at registration time
+    // and we silently dropped the row. Tell the client this is recoverable
+    // (expired:true) so its existing auto-refresh path will re-subscribe and
+    // re-register cleanly on the next attempt.
     return NextResponse.json(
-      { error: "Subscription not registered on server. Re-enable notifications and try again." },
+      {
+        error: "Subscription not registered on server. Auto-refreshing…",
+        expired: true,
+        upstreamStatus: 404,
+      },
       { status: 404 }
     )
   }

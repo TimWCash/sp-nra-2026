@@ -43,16 +43,29 @@ function detectStandalone(): boolean {
   return iosStandalone || mediaStandalone
 }
 
+/** True if we got a 2xx confirming the row landed on the server. */
+async function registerOnServer(sub: PushSubscription): Promise<boolean> {
+  try {
+    const res = await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sub.toJSON()),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 async function subscribeToPush(opts: { forceFresh?: boolean } = {}): Promise<PushSubscription | null> {
   if (!("serviceWorker" in navigator) || !VAPID_PUBLIC_KEY) return null
   const reg = await navigator.serviceWorker.ready
   const existing = await reg.pushManager.getSubscription()
   if (existing && !opts.forceFresh) {
-    await fetch("/api/push/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(existing.toJSON()),
-    })
+    // Verify the server actually has us. If registration fails, do NOT swallow —
+    // return null so the UI can reflect the real state instead of a phantom ✅.
+    const ok = await registerOnServer(existing)
+    if (!ok) return null
     try { localStorage.setItem(VAPID_KEY_STAMP_KEY, VAPID_PUBLIC_KEY) } catch {}
     return existing
   }
@@ -73,11 +86,8 @@ async function subscribeToPush(opts: { forceFresh?: boolean } = {}): Promise<Pus
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
   })
-  await fetch("/api/push/subscribe", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(sub.toJSON()),
-  })
+  const ok = await registerOnServer(sub)
+  if (!ok) return null
   try { localStorage.setItem(VAPID_KEY_STAMP_KEY, VAPID_PUBLIC_KEY) } catch {}
   return sub
 }
