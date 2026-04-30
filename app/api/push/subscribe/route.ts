@@ -3,11 +3,15 @@ import { addSubscription, removeSubscription, countSubscriptions } from "@/lib/p
 
 export async function POST(req: Request) {
   try {
-    const sub = await req.json()
+    const body = await req.json()
+    // Body now is either the legacy raw subscription, OR { subscription, teamMember }.
+    // Support both so a stale client during deploy doesn't break.
+    const sub = body?.subscription ?? body
+    const teamMember: string | undefined = typeof body?.teamMember === "string" ? body.teamMember : undefined
     if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
       return NextResponse.json({ error: "Invalid subscription" }, { status: 400 })
     }
-    await addSubscription(sub)
+    await addSubscription(sub, teamMember)
     const count = await countSubscriptions()
     return NextResponse.json({ ok: true, count })
   } catch (err) {

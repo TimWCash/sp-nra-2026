@@ -80,6 +80,19 @@ async function fetchSubscriberCount(): Promise<number> {
   } catch { return 0 }
 }
 
+async function fetchRegisteredNames(): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from("push_subscriptions")
+      .select("team_member")
+    if (error || !data) return []
+    const names = (data as { team_member: string | null }[])
+      .map((r) => (r.team_member || "").trim())
+      .filter(Boolean)
+    return Array.from(new Set(names))
+  } catch { return [] }
+}
+
 async function postBatSignal(active: boolean): Promise<void> {
   try {
     await fetch("/api/bat-signal", {
@@ -98,6 +111,8 @@ export function TeamStatusPage() {
   const [pulse, setPulse] = useState(false)
   const [shiftFilter, setShiftFilter] = useState<ShiftFilter>("all")
   const [subCount, setSubCount] = useState<number | null>(null)
+  const [registeredNames, setRegisteredNames] = useState<string[]>([])
+  const [showRegistry, setShowRegistry] = useState(false)
   // Track the previous signal state so we only vibrate on a false→true transition,
   // not on every render or on the initial mount if the signal was already active.
   const prevBatActiveRef = useRef<boolean | null>(null)
@@ -107,6 +122,7 @@ export function TeamStatusPage() {
     setLeadCount(getLeadCount())
     fetchBatSignal().then(setBatSignalState)
     fetchSubscriberCount().then(setSubCount)
+    fetchRegisteredNames().then(setRegisteredNames)
   }, [])
 
   useEffect(() => {
@@ -114,6 +130,7 @@ export function TeamStatusPage() {
       fetchBatSignal().then(setBatSignalState)
       setLeadCount(getLeadCount())
       fetchSubscriberCount().then(setSubCount)
+      fetchRegisteredNames().then(setRegisteredNames)
     }, 5000)
     return () => clearInterval(interval)
   }, [])
@@ -233,7 +250,7 @@ export function TeamStatusPage() {
       {!batSignal.active && (
         <button
           onClick={activateBatSignal}
-          className="w-full rounded-2xl p-5 mb-5 flex flex-col items-center gap-2 cursor-pointer active:scale-[0.97] transition-all duration-150 border-0"
+          className="w-full rounded-2xl p-5 mb-3 flex flex-col items-center gap-2 cursor-pointer active:scale-[0.97] transition-all duration-150 border-0"
           style={{
             background: "linear-gradient(135deg, #1a1a2e, #16213e)",
             boxShadow: "0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)",
@@ -242,29 +259,90 @@ export function TeamStatusPage() {
           <span className="text-5xl" style={{ filter: "drop-shadow(0 0 12px rgba(255,200,0,0.8))" }}>🦇</span>
           <div className="text-white font-extrabold text-[17px] tracking-wide">BAT SIGNAL</div>
           <div className="text-white/50 text-[12px]">Booth is slammed — call all hands</div>
-          {subCount !== null && (
-            <div
-              className="mt-1 text-[11px] font-semibold px-2.5 py-1 rounded-full"
-              style={{
-                background: subCount === 0
-                  ? "rgba(220,53,69,0.25)"
-                  : subCount >= teamData.length
-                    ? "rgba(0,200,120,0.2)"
-                    : "rgba(255,200,0,0.15)",
-                color: subCount === 0
-                  ? "#ff8a95"
-                  : subCount >= teamData.length
-                    ? "#7fe4b2"
-                    : "#ffd66b",
-              }}>
+        </button>
+      )}
+
+      {/* ── DEVICES REGISTERED CHIP — tap to expand the per-name registry ── */}
+      {!batSignal.active && subCount !== null && (
+        <>
+          <button
+            onClick={() => setShowRegistry((v) => !v)}
+            className="w-full mb-3 text-[12px] font-semibold px-3 py-2 rounded-xl flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] transition-all"
+            style={{
+              background: subCount === 0
+                ? "var(--danger-light)"
+                : registeredNames.length >= teamData.length
+                  ? "var(--success-light)"
+                  : "var(--amber-light)",
+              border: `1px solid ${subCount === 0 ? "var(--danger)" : registeredNames.length >= teamData.length ? "var(--success)" : "var(--amber)"}`,
+              color: subCount === 0
+                ? "var(--danger)"
+                : registeredNames.length >= teamData.length
+                  ? "var(--success)"
+                  : "var(--amber)",
+            }}>
+            <span>
               {subCount === 0
                 ? `⚠️ No devices registered · run setup`
-                : subCount >= teamData.length
-                  ? `✅ ${subCount}/${teamData.length} devices registered`
-                  : `${subCount}/${teamData.length} devices registered`}
+                : registeredNames.length >= teamData.length
+                  ? `✅ ${registeredNames.length}/${teamData.length} teammates registered`
+                  : `${registeredNames.length}/${teamData.length} teammates registered`}
+            </span>
+            <span className="text-[10px] opacity-70">{showRegistry ? "hide" : "see who"}</span>
+          </button>
+
+          {showRegistry && (
+            <div className="rounded-xl mb-5 overflow-hidden"
+              style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+              {teamData.map((m, i) => {
+                const isRegistered = registeredNames.some(
+                  (n) => n.toLowerCase() === m.name.toLowerCase()
+                )
+                return (
+                  <div key={m.name}
+                    className={`flex items-center gap-3 px-4 py-2.5 ${i < teamData.length - 1 ? "border-b" : ""}`}
+                    style={{ borderColor: "var(--border)" }}>
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                      style={{
+                        background: isRegistered ? "var(--success-light)" : "var(--surface-alt)",
+                        color: isRegistered ? "var(--success)" : "var(--text-muted)",
+                      }}>
+                      {m.initials}
+                    </div>
+                    <div className="flex-1 text-[13px] font-semibold"
+                      style={{ color: isRegistered ? "var(--text)" : "var(--text-muted)" }}>
+                      {m.name}
+                    </div>
+                    <span className="text-[11px] font-bold"
+                      style={{ color: isRegistered ? "var(--success)" : "var(--text-muted)" }}>
+                      {isRegistered ? "✅ ready" : "⬜ not yet"}
+                    </span>
+                  </div>
+                )
+              })}
+              {/* Surface any unrecognized names that came through (e.g. someone
+                  typed/picked something not in the team list). */}
+              {registeredNames
+                .filter((n) => !teamData.some((m) => m.name.toLowerCase() === n.toLowerCase()))
+                .map((n) => (
+                  <div key={`extra-${n}`}
+                    className="flex items-center gap-3 px-4 py-2.5 border-t"
+                    style={{ borderColor: "var(--border)" }}>
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                      style={{ background: "var(--accent-light)", color: "var(--accent)" }}>
+                      ?
+                    </div>
+                    <div className="flex-1 text-[13px] font-semibold" style={{ color: "var(--text)" }}>
+                      {n}
+                    </div>
+                    <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                      not on team list
+                    </span>
+                  </div>
+                ))}
             </div>
           )}
-        </button>
+        </>
       )}
 
       <h2 className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: "var(--text-muted)" }}>

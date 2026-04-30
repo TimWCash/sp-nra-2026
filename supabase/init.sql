@@ -41,8 +41,12 @@ create table if not exists public.session_notes (
 create table if not exists public.push_subscriptions (
   endpoint     text primary key,
   subscription jsonb not null,
+  team_member  text default '',  -- the teammate this device belongs to (display only)
   last_used_at timestamptz default now()
 );
+-- For existing projects that pre-date the team_member column:
+alter table public.push_subscriptions
+  add column if not exists team_member text default '';
 
 -- ── Team travel (flights + accommodation, edited from Team page) ─────────
 create table if not exists public.team_travel (

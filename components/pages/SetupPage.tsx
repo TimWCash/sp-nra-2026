@@ -3,10 +3,25 @@
 import { useCallback, useEffect, useState } from "react"
 import {
   CheckCircle2, Circle, Share, Bell, Zap, Loader2,
-  AlertCircle, Smartphone, Plus,
+  AlertCircle, Smartphone, Plus, User as UserIcon,
 } from "lucide-react"
+import { team as teamData } from "@/lib/data"
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""
+
+// Same key SessionNotes uses, so identifying yourself anywhere identifies
+// you everywhere.
+const USER_NAME_KEY = "sp_user_name"
+
+function loadUserName(): string {
+  if (typeof window === "undefined") return ""
+  return localStorage.getItem(USER_NAME_KEY) || ""
+}
+
+function saveUserName(name: string): void {
+  if (typeof window === "undefined") return
+  localStorage.setItem(USER_NAME_KEY, name)
+}
 
 // Stored client-side the moment a subscription is created. If the public key
 // in the env changes (e.g. Tim rotates VAPID keys in Vercel), every teammate's
@@ -44,12 +59,12 @@ function detectStandalone(): boolean {
 }
 
 /** True if we got a 2xx confirming the row landed on the server. */
-async function registerOnServer(sub: PushSubscription): Promise<boolean> {
+async function registerOnServer(sub: PushSubscription, teamMember: string): Promise<boolean> {
   try {
     const res = await fetch("/api/push/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(sub.toJSON()),
+      body: JSON.stringify({ subscription: sub.toJSON(), teamMember }),
     })
     return res.ok
   } catch {
@@ -61,10 +76,11 @@ async function subscribeToPush(opts: { forceFresh?: boolean } = {}): Promise<Pus
   if (!("serviceWorker" in navigator) || !VAPID_PUBLIC_KEY) return null
   const reg = await navigator.serviceWorker.ready
   const existing = await reg.pushManager.getSubscription()
+  const teamMember = loadUserName()
   if (existing && !opts.forceFresh) {
     // Verify the server actually has us. If registration fails, do NOT swallow —
     // return null so the UI can reflect the real state instead of a phantom ✅.
-    const ok = await registerOnServer(existing)
+    const ok = await registerOnServer(existing, teamMember)
     if (!ok) return null
     try { localStorage.setItem(VAPID_KEY_STAMP_KEY, VAPID_PUBLIC_KEY) } catch {}
     return existing
@@ -86,7 +102,7 @@ async function subscribeToPush(opts: { forceFresh?: boolean } = {}): Promise<Pus
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
   })
-  const ok = await registerOnServer(sub)
+  const ok = await registerOnServer(sub, teamMember)
   if (!ok) return null
   try { localStorage.setItem(VAPID_KEY_STAMP_KEY, VAPID_PUBLIC_KEY) } catch {}
   return sub
@@ -129,6 +145,9 @@ export function SetupPage() {
   const [enabling, setEnabling] = useState(false)
   const [testState, setTestState] = useState<TestState>("idle")
   const [testError, setTestError] = useState<string | null>(null)
+  // Who is this device. Loaded from localStorage on mount; required before
+  // we'll let the user finish Step 3 so the registered-devices list is useful.
+  const [userName, setUserName] = useState("")
 
   const detect = useCallback(async () => {
     setPlatform(detectPlatform())
@@ -155,6 +174,7 @@ export function SetupPage() {
 
   useEffect(() => {
     detect()
+    setUserName(loadUserName())
     // Re-check when user returns to tab (e.g. after installing the PWA in Safari)
     const onFocus = () => detect()
     window.addEventListener("focus", onFocus)
@@ -164,6 +184,14 @@ export function SetupPage() {
       window.removeEventListener("visibilitychange", onFocus)
     }
   }, [detect])
+
+  function pickName(name: string) {
+    saveUserName(name)
+    setUserName(name)
+    // If they were already subscribed before identifying, push the name up to
+    // the server immediately so they show up on the team list.
+    if (hasPushSub) subscribeToPush().catch(() => {})
+  }
 
   async function enableNotifications() {
     if (enabling) return
@@ -266,7 +294,8 @@ export function SetupPage() {
   const installOk = !installRequired || standalone
   const notifOk = notifPermission === "granted"
   const pushOk = hasPushSub
-  const allReady = installOk && notifOk && pushOk
+  const identityOk = !!userName
+  const allReady = installOk && notifOk && pushOk && identityOk
 
   return (
     <div className="animate-fade-in">
@@ -307,6 +336,56 @@ export function SetupPage() {
           </div>
         </div>
       )}
+
+      {/* Identify yourself — required before registering, so the team list
+          on Team Status can show who's still missing setup. */}
+      <div className="rounded-2xl p-4 mb-3"
+        style={{
+          background: userName ? "var(--surface)" : "var(--accent-light)",
+          border: `1px solid ${userName ? "var(--border)" : "var(--accent)"}`,
+        }}>
+        {userName ? (
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <UserIcon size={14} style={{ color: "var(--accent)" }} className="flex-shrink-0" />
+              <span className="text-[13px] truncate" style={{ color: "var(--text-secondary)" }}>
+                You&apos;re registering as <b style={{ color: "var(--text)" }}>{userName}</b>
+              </span>
+            </div>
+            <button
+              onClick={() => { saveUserName(""); setUserName("") }}
+              className="text-[11px] font-semibold cursor-pointer bg-transparent border-0 underline flex-shrink-0"
+              style={{ color: "var(--text-muted)" }}>
+              change
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 mb-2">
+              <UserIcon size={14} style={{ color: "var(--accent)" }} />
+              <span className="text-[13px] font-bold" style={{ color: "var(--accent)" }}>
+                Who are you?
+              </span>
+            </div>
+            <p className="text-[12px] mb-3" style={{ color: "var(--text-secondary)" }}>
+              Pick your name so the team can see you&apos;re ready.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {teamData.map((m) => (
+                <button key={m.name} onClick={() => pickName(m.name)}
+                  className="flex items-center gap-2 rounded-xl py-2.5 px-3 cursor-pointer active:scale-[0.97] transition-all text-left border"
+                  style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                    style={{ background: "var(--accent-light)", color: "var(--accent)" }}>
+                    {m.initials}
+                  </div>
+                  <span className="text-[13px] font-semibold truncate" style={{ color: "var(--text)" }}>{m.name}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
 
       {/* STEP 1: Install as PWA */}
       <Step
@@ -385,15 +464,17 @@ export function SetupPage() {
       {/* STEP 3: Push subscription */}
       <Step
         n={3}
-        done={pushOk}
+        done={pushOk && identityOk}
         icon={<Zap size={18} />}
         title="Register with the team server"
-        locked={!notifOk}
+        locked={!notifOk || !identityOk}
       >
         {!notifOk ? (
           <p>Finish Step 2 first.</p>
+        ) : !identityOk ? (
+          <p>Pick your name above first — the server stores it so the team can see you&apos;re ready.</p>
         ) : pushOk ? (
-          <p>Subscribed. ✅ The server knows how to reach your phone.</p>
+          <p>Subscribed as <b>{userName}</b>. ✅ The server knows how to reach your phone.</p>
         ) : (
           <>
             <p className="mb-3">

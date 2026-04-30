@@ -19,16 +19,41 @@ export type StoredSubscription = {
 type Row = {
   endpoint: string
   subscription: StoredSubscription
+  team_member?: string | null
 }
 
-export async function addSubscription(sub: StoredSubscription): Promise<void> {
+export async function addSubscription(
+  sub: StoredSubscription,
+  teamMember?: string,
+): Promise<void> {
+  const row: Record<string, unknown> = {
+    endpoint: sub.endpoint,
+    subscription: sub,
+    last_used_at: new Date().toISOString(),
+  }
+  // Only set team_member if we have one — avoids clobbering an existing name
+  // when an unidentified retry comes through. ("" still wipes; undefined skips.)
+  if (teamMember && teamMember.trim()) row.team_member = teamMember.trim()
   const { error } = await supabase
     .from("push_subscriptions")
-    .upsert(
-      { endpoint: sub.endpoint, subscription: sub, last_used_at: new Date().toISOString() },
-      { onConflict: "endpoint" }
-    )
+    .upsert(row, { onConflict: "endpoint" })
   if (error) throw error
+}
+
+/**
+ * Names of every teammate who currently has a push subscription on file.
+ * Used by Team Status to show which teammates are still missing from setup.
+ */
+export async function getRegisteredNames(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("push_subscriptions")
+    .select("team_member")
+  if (error || !data) return []
+  const names = (data as { team_member: string | null }[])
+    .map((r) => (r.team_member || "").trim())
+    .filter(Boolean)
+  // Dedupe — one teammate may have two devices.
+  return Array.from(new Set(names))
 }
 
 export async function removeSubscription(endpoint: string): Promise<void> {
