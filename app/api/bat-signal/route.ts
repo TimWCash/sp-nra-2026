@@ -67,6 +67,26 @@ export async function POST(req: Request) {
   // finding: persisting active before fan-out creates "saved as active but
   // 0/{total} received" — exactly the false confidence this whole pass is
   // supposed to prevent.
+  //
+  // Pre-flight: if zero devices are registered, we can't broadcast at all.
+  // Round-4 review correctly insisted this be a hard failure rather than
+  // an "active with warning" — pretending the signal landed when nobody got
+  // it is the failure mode the team can't recover from in real time.
+  const preCount = await countSubscriptions().catch(() => 0)
+  if (preCount === 0) {
+    return NextResponse.json(
+      {
+        error: "Zero devices are registered — Bat Signal NOT activated. Have the team run setup, or escalate manually.",
+        active: false,
+        since: 0,
+        pushed: 0,
+        failed: 0,
+        total: 0,
+      },
+      { status: 502 },
+    )
+  }
+
   let pushed = 0
   let failed = 0
   let total = 0
@@ -131,9 +151,7 @@ export async function POST(req: Request) {
     )
   }
 
-  // Special case: total === 0 means nobody is registered. Still flip state
-  // (so the in-app banner appears for anyone who happens to be looking) but
-  // include a loud warning so the operator knows push didn't fire.
+  // At least one push landed. Persist active=true and return.
   const persisted = await setBatSignalState(true)
   if (!persisted) {
     return NextResponse.json(
@@ -151,11 +169,8 @@ export async function POST(req: Request) {
 
   const state = await getBatSignalState()
   const totalNow = await countSubscriptions().catch(() => total)
-  let warning: string | undefined
-  if (totalNow === 0) {
-    warning = "Bat Signal active, but NO devices are registered to receive push. Have the team run setup."
-  } else if (failed > 0) {
-    warning = `${failed} of ${total} devices did not receive the alert.`
-  }
+  const warning = failed > 0
+    ? `${failed} of ${total} devices did not receive the alert.`
+    : undefined
   return NextResponse.json({ ...state, pushed, failed, total: totalNow, warning })
 }

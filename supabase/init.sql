@@ -110,11 +110,13 @@ create table if not exists public.podcast_bookings (
 --   - nra_leads:          anon = SELECT, INSERT, UPDATE. NO DELETE.
 --                         (deleteLead goes via /api/leads/[id] using the
 --                         service role key.)
---   - push_subscriptions: anon = SELECT only. Server-side writes go through
---                         lib/pushStore using SUPABASE_SERVICE_ROLE_KEY so
---                         anyone holding the publishable key can't wipe the
---                         team's bat-signal subscriber list (a real attack
---                         the round-2 review caught).
+--   - push_subscriptions: anon = NO ACCESS AT ALL. The round-4 review caught
+--                         a "confused deputy" attack — anon SELECT exposed
+--                         endpoint URLs that an attacker could feed into our
+--                         service-role-backed DELETE route to wipe the team's
+--                         bat-signal subscribers. Now: client uses the
+--                         /api/push/status endpoint for the count + names it
+--                         needs; everything else goes through service role.
 --   - session_notes,
 --     show_photos,
 --     podcast_bookings,
@@ -128,6 +130,12 @@ create table if not exists public.podcast_bookings (
 do $$
 declare
   tbl text;
+  -- Tables where anon SELECT is acceptable. push_subscriptions is excluded
+  -- so endpoint URLs aren't leakable to anyone holding the publishable key.
+  select_ok_tbls text[] := array[
+    'nra_leads','session_notes','team_travel','show_photos',
+    'podcast_bookings','bat_signal_state'
+  ];
   -- Tables where anon DELETE is acceptable (recoverable inconveniences).
   -- nra_leads + push_subscriptions are intentionally NOT here — bulk delete
   -- is the catastrophic failure mode we're guarding against. Both go
@@ -159,11 +167,12 @@ begin
     execute format('drop policy if exists "anon_update" on public.%I', tbl);
     execute format('drop policy if exists "anon_delete" on public.%I', tbl);
 
-    -- Everyone gets SELECT.
-    execute format(
-      'create policy "anon_select" on public.%I for select to anon using (true)',
-      tbl
-    );
+    if tbl = any(select_ok_tbls) then
+      execute format(
+        'create policy "anon_select" on public.%I for select to anon using (true)',
+        tbl
+      );
+    end if;
 
     if tbl = any(insert_ok_tbls) then
       execute format(

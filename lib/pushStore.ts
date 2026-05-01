@@ -1,45 +1,46 @@
 /**
- * Push subscription storage — backed by Supabase.
+ * Push subscription storage — backed by Supabase, server-side ONLY.
  *
  * Previously this was an in-memory Map on globalThis, which silently failed on
  * Vercel: every serverless function invocation can land on a different instance,
  * so subscribe() and sendNotification() routinely saw different (or empty) state.
  * Moving it to Supabase makes subscriptions shared across all instances.
  *
- * Read paths (count, get, getAll, getRegisteredNames) use the publishable
- * client because they're called from both client + server. RLS allows anon
- * SELECT on push_subscriptions.
- *
- * Write paths (addSubscription, removeSubscription, markFailure, clearFailure)
- * use the SERVICE ROLE client. They're only ever called from server-side API
- * routes. RLS forbids anon INSERT/UPDATE/DELETE on push_subscriptions —
- * which means a leaked publishable key can't wipe the team's bat signal
- * subscriber list (the round-2 review caught this exact attack).
- *
- * If SUPABASE_SERVICE_ROLE_KEY isn't set in the env, write paths log a loud
- * warning and fall back to the anon client — registration works (anon INSERT
- * via the upsert ignoreDuplicates path) but the security guarantee is lost
- * and DELETEs/UPDATEs fail. The fallback is intentional so the app doesn't
- * become totally non-functional during the env-var rollout window.
+ * Hardening (round 4):
+ * - `import "server-only"` makes this module a build-error if it's ever
+ *   pulled into a client component bundle. The service role key must never
+ *   ship to the browser.
+ * - All operations (read AND write) use the SERVICE ROLE client. With anon
+ *   SELECT removed from push_subscriptions in RLS, the publishable key can't
+ *   read or write the table at all — every interaction goes through the
+ *   server routes that import this module.
+ * - Missing SUPABASE_SERVICE_ROLE_KEY is now a HARD ERROR, not a fallback.
+ *   The app should fail loudly at the first request rather than degrade
+ *   confusingly.
  */
+import "server-only"
+
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
-import { supabase } from "@/lib/supabase"
 import type { PushSubscription as WebPushSubscription } from "web-push"
 
-let _serviceClient: SupabaseClient | null | undefined
+let _serviceClient: SupabaseClient | undefined
 
-/** Returns the service-role-backed client, or anon as fallback. */
+/**
+ * Returns the service-role-backed Supabase client. Throws hard if the env
+ * var is missing — round-4 review correctly noted that the previous "fall
+ * back to anon" behavior just turned a config error into a confusing
+ * runtime failure mode.
+ */
 function getWriteClient(): SupabaseClient {
-  if (_serviceClient !== undefined) return _serviceClient ?? supabase
+  if (_serviceClient) return _serviceClient
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !serviceKey) {
-    console.warn(
-      "[pushStore] SUPABASE_SERVICE_ROLE_KEY is not set — falling back to the anon client. " +
-      "Push subscription writes will fail RLS until the env var is configured.",
+  if (!url) throw new Error("Server misconfigured: NEXT_PUBLIC_SUPABASE_URL is missing")
+  if (!serviceKey) {
+    throw new Error(
+      "Server misconfigured: SUPABASE_SERVICE_ROLE_KEY is missing — push subscription " +
+      "operations cannot proceed. Set the env var on Vercel and redeploy.",
     )
-    _serviceClient = null
-    return supabase
   }
   _serviceClient = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -102,7 +103,7 @@ export async function addSubscription(
  * Used by Team Status to show which teammates are still missing from setup.
  */
 export async function getRegisteredNames(): Promise<string[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getWriteClient()
     .from("push_subscriptions")
     .select("team_member")
   if (error || !data) return []
@@ -171,7 +172,7 @@ export type UnhealthySub = {
  * a bat signal goes out instead of after.
  */
 export async function getUnhealthySubs(): Promise<UnhealthySub[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getWriteClient()
     .from("push_subscriptions")
     .select("endpoint, team_member, last_failure_status, failure_count")
     .gt("failure_count", 0)
@@ -200,7 +201,7 @@ export async function removeSubscription(endpoint: string): Promise<void> {
 export async function getSubscription(
   endpoint: string
 ): Promise<WebPushSubscription | null> {
-  const { data, error } = await supabase
+  const { data, error } = await getWriteClient()
     .from("push_subscriptions")
     .select("endpoint, subscription")
     .eq("endpoint", endpoint)
@@ -214,7 +215,7 @@ export async function getSubscription(
 }
 
 export async function getAllSubscriptions(): Promise<WebPushSubscription[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getWriteClient()
     .from("push_subscriptions")
     .select("endpoint, subscription")
   if (error || !data) return []
@@ -226,7 +227,7 @@ export async function getAllSubscriptions(): Promise<WebPushSubscription[]> {
 }
 
 export async function countSubscriptions(): Promise<number> {
-  const { count, error } = await supabase
+  const { count, error } = await getWriteClient()
     .from("push_subscriptions")
     .select("*", { count: "exact", head: true })
   if (error) return 0

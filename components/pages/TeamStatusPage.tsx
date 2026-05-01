@@ -70,27 +70,26 @@ async function fetchBatSignal(): Promise<{ active: boolean; since: number }> {
   } catch { return { active: false, since: 0 } }
 }
 
-async function fetchSubscriberCount(): Promise<number> {
+/**
+ * Fetch subscriber summary from the server-side status endpoint.
+ *
+ * The push_subscriptions table is no longer directly readable by the anon
+ * client (RLS removed anon SELECT after the round-4 review's confused-deputy
+ * finding). The server route returns the minimal projection — count + names
+ * — without ever exposing endpoint URLs to the client.
+ */
+async function fetchPushStatus(): Promise<{ count: number; registeredNames: string[] }> {
   try {
-    const { count, error } = await supabase
-      .from("push_subscriptions")
-      .select("*", { count: "exact", head: true })
-    if (error) return 0
-    return count ?? 0
-  } catch { return 0 }
-}
-
-async function fetchRegisteredNames(): Promise<string[]> {
-  try {
-    const { data, error } = await supabase
-      .from("push_subscriptions")
-      .select("team_member")
-    if (error || !data) return []
-    const names = (data as { team_member: string | null }[])
-      .map((r) => (r.team_member || "").trim())
-      .filter(Boolean)
-    return Array.from(new Set(names))
-  } catch { return [] }
+    const res = await fetch("/api/push/status", { cache: "no-store" })
+    if (!res.ok) return { count: 0, registeredNames: [] }
+    const json = await res.json()
+    return {
+      count: typeof json.count === "number" ? json.count : 0,
+      registeredNames: Array.isArray(json.registeredNames) ? json.registeredNames : [],
+    }
+  } catch {
+    return { count: 0, registeredNames: [] }
+  }
 }
 
 async function postBatSignal(active: boolean): Promise<void> {
@@ -121,16 +120,20 @@ export function TeamStatusPage() {
     setTeam(loadTeam())
     setLeadCount(getLeadCount())
     fetchBatSignal().then(setBatSignalState)
-    fetchSubscriberCount().then(setSubCount)
-    fetchRegisteredNames().then(setRegisteredNames)
+    fetchPushStatus().then(({ count, registeredNames }) => {
+      setSubCount(count)
+      setRegisteredNames(registeredNames)
+    })
   }, [])
 
   useEffect(() => {
     const interval = setInterval(() => {
       fetchBatSignal().then(setBatSignalState)
       setLeadCount(getLeadCount())
-      fetchSubscriberCount().then(setSubCount)
-      fetchRegisteredNames().then(setRegisteredNames)
+      fetchPushStatus().then(({ count, registeredNames }) => {
+        setSubCount(count)
+        setRegisteredNames(registeredNames)
+      })
     }, 5000)
     return () => clearInterval(interval)
   }, [])

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { addSubscription, removeSubscription, countSubscriptions } from "@/lib/pushStore"
+import { addSubscription, countSubscriptions } from "@/lib/pushStore"
 
 export async function POST(req: Request) {
   try {
@@ -20,14 +20,16 @@ export async function POST(req: Request) {
   }
 }
 
-export async function DELETE(req: Request) {
-  try {
-    const { endpoint } = await req.json()
-    if (!endpoint) return NextResponse.json({ error: "Missing endpoint" }, { status: 400 })
-    await removeSubscription(endpoint)
-    return NextResponse.json({ ok: true })
-  } catch (err) {
-    console.error("Push unsubscribe error:", err)
-    return NextResponse.json({ error: "Failed" }, { status: 500 })
-  }
-}
+// DELETE handler intentionally REMOVED.
+//
+// Round-4 review correctly identified a "confused deputy" attack: even though
+// RLS forbids anon DELETE on push_subscriptions directly, an attacker holding
+// the publishable key could SELECT every endpoint, then call this route's
+// DELETE handler with each endpoint, using OUR service-role privileges to
+// wipe the team's bat-signal subscriber list.
+//
+// Killing the route entirely closes that vector. Dead subscriptions clean up
+// naturally via the bat-signal fan-out's 404/410 pruning, so we don't need
+// a client-initiated unsubscribe path. The previous force-fresh logic in
+// SetupPage.tsx still calls this endpoint for safety, but the fetch will
+// 405 silently and the next bat signal prunes the dead row.
