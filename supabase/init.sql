@@ -80,14 +80,30 @@ create table if not exists public.podcast_bookings (
 
 -- ── RLS: this app uses the anon key directly from the browser. Tables are
 -- not sensitive (no PII beyond names/emails the team chooses to capture for
--- a single trade show). Easiest option: leave RLS disabled. If you ever want
--- to lock it down, replace the lines below with explicit policies.
-alter table public.nra_leads          disable row level security;
-alter table public.session_notes      disable row level security;
-alter table public.push_subscriptions disable row level security;
-alter table public.team_travel        disable row level security;
-alter table public.show_photos        disable row level security;
-alter table public.podcast_bookings   disable row level security;
+-- a single trade show). With the new sb_publishable_* keys Supabase rolled
+-- out, just disabling RLS no longer permits anon writes — you have to leave
+-- RLS enabled and add explicit policies. So: enable RLS + allow-everything
+-- policy for anon and authenticated.
+do $$
+declare tbl text;
+begin
+  foreach tbl in array array[
+    'nra_leads','session_notes','push_subscriptions',
+    'team_travel','show_photos','podcast_bookings'
+  ] loop
+    execute format('alter table public.%I enable row level security', tbl);
+    execute format('drop policy if exists "anon_full_access" on public.%I', tbl);
+    execute format(
+      'create policy "anon_full_access" on public.%I for all to anon using (true) with check (true)',
+      tbl
+    );
+    execute format('drop policy if exists "auth_full_access" on public.%I', tbl);
+    execute format(
+      'create policy "auth_full_access" on public.%I for all to authenticated using (true) with check (true)',
+      tbl
+    );
+  end loop;
+end $$;
 
 -- ── Realtime: the app subscribes to postgres_changes on these tables so
 -- one teammate's edit shows up on every other device within a second.
