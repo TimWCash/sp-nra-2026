@@ -110,13 +110,11 @@ create table if not exists public.podcast_bookings (
 --   - nra_leads:          anon = SELECT, INSERT, UPDATE. NO DELETE.
 --                         (deleteLead goes via /api/leads/[id] using the
 --                         service role key.)
---   - push_subscriptions: anon = SELECT, INSERT, UPDATE, DELETE.
---                         The server routes (/api/push/subscribe + bat-signal)
---                         use the anon client, so locking down anon writes
---                         would break registration. Sub spam isn't a real
---                         threat: the endpoint validates shape, and any
---                         garbage subs auto-prune on the next bat signal
---                         (404/410 from APNS/FCM).
+--   - push_subscriptions: anon = SELECT only. Server-side writes go through
+--                         lib/pushStore using SUPABASE_SERVICE_ROLE_KEY so
+--                         anyone holding the publishable key can't wipe the
+--                         team's bat-signal subscriber list (a real attack
+--                         the round-2 review caught).
 --   - session_notes,
 --     show_photos,
 --     podcast_bookings,
@@ -131,15 +129,20 @@ do $$
 declare
   tbl text;
   -- Tables where anon DELETE is acceptable (recoverable inconveniences).
-  -- nra_leads is intentionally NOT here — bulk delete is the catastrophic
-  -- failure mode we're guarding against.
+  -- nra_leads + push_subscriptions are intentionally NOT here — bulk delete
+  -- is the catastrophic failure mode we're guarding against. Both go
+  -- through service-role server routes for any destructive op.
   delete_ok_tbls text[] := array[
-    'session_notes','show_photos','podcast_bookings','team_travel',
-    'push_subscriptions'
+    'session_notes','show_photos','podcast_bookings','team_travel'
   ];
   update_ok_tbls text[] := array[
     'nra_leads','team_travel','bat_signal_state','session_notes',
-    'show_photos','podcast_bookings','push_subscriptions'
+    'show_photos','podcast_bookings'
+  ];
+  -- Tables where anon INSERT is acceptable. push_subscriptions is excluded
+  -- because writes go through the service-role pushStore.
+  insert_ok_tbls text[] := array[
+    'nra_leads','session_notes','team_travel','show_photos','podcast_bookings'
   ];
 begin
   foreach tbl in array array[
@@ -162,9 +165,7 @@ begin
       tbl
     );
 
-    -- INSERT on every table the app writes (everything except bat_signal_state,
-    -- which is upsert-by-id-1 and pre-seeded).
-    if tbl <> 'bat_signal_state' then
+    if tbl = any(insert_ok_tbls) then
       execute format(
         'create policy "anon_insert" on public.%I for insert to anon with check (true)',
         tbl
@@ -216,7 +217,12 @@ begin
       execute format('alter publication supabase_realtime add table public.%I', tbl);
     exception
       when duplicate_object then null;  -- already in the publication, fine.
-      when others then null;            -- unknown table, ignore (e.g. partial schema).
+      when others then
+        -- Log loudly — round-3 review correctly noted that swallowing this
+        -- can hide real schema/setup failures (e.g. typo in table name,
+        -- missing table). RAISE NOTICE shows up in the SQL editor output
+        -- but doesn't fail the script.
+        raise notice 'Could not add %.% to supabase_realtime: %', 'public', tbl, sqlerrm;
     end;
   end loop;
 end $$;

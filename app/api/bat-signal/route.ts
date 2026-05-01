@@ -49,78 +49,80 @@ export async function POST(req: Request) {
     )
   }
 
-  // Persist new state. If the write fails we refuse to do anything else —
-  // partial state is worse than no state.
-  const persisted = await setBatSignalState(wantActive)
-  if (!persisted) {
-    return NextResponse.json(
-      {
-        error: "Could not persist Bat Signal state to Supabase.",
-        active: false,
-        since: 0,
-        pushed: 0,
-        failed: 0,
-        total: 0,
-      },
-      { status: 500 },
-    )
+  // Deactivation path is simple and unconditional — turning off doesn't
+  // require pushes, so persist immediately and return.
+  if (!wantActive) {
+    const ok = await setBatSignalState(false)
+    if (!ok) {
+      return NextResponse.json(
+        { error: "Could not persist Bat Signal state.", active: true, since: 0, pushed: 0, failed: 0, total: 0 },
+        { status: 500 },
+      )
+    }
+    return NextResponse.json({ active: false, since: 0, pushed: 0, failed: 0, total: 0 })
   }
 
+  // Activation path: fan out FIRST so we don't persist `active=true` before
+  // we know whether the alert actually got out. The round-2 review's strongest
+  // finding: persisting active before fan-out creates "saved as active but
+  // 0/{total} received" — exactly the false confidence this whole pass is
+  // supposed to prevent.
   let pushed = 0
   let failed = 0
   let total = 0
   const failures: Array<{ status: number; endpoint: string }> = []
 
-  if (wantActive) {
-    try {
-      const subs = await getAllSubscriptions()
-      total = subs.length
-      if (subs.length > 0) {
-        const webpush = (await import("web-push")).default
-        webpush.setVapidDetails(vapidMailto, vapidPublic!, vapidPrivate!)
-        const payload = JSON.stringify({
-          title: "🦇 BAT SIGNAL",
-          body: "Booth #7365 is SLAMMED — get back now!",
-        })
-        const results = await Promise.allSettled(
-          subs.map(async (sub) => {
-            const endpoint = (sub as PushSubscription).endpoint
-            try {
-              await webpush.sendNotification(sub as PushSubscription, payload)
-              // Successful delivery clears any prior failure flag — sub
-              // recovered, stop showing it as unhealthy.
-              await clearFailure(endpoint).catch(() => {})
-            } catch (err) {
-              const status = (err as { statusCode?: number } | null)?.statusCode ?? 0
-              if (status === 404 || status === 410) {
-                // Subscription gone for good. Prune it.
-                await removeSubscription(endpoint).catch(() => {})
-              } else if (status === 400 || status === 403 || status >= 500) {
-                // Could be transient (rate limit, brief APNS hiccup, VAPID drift
-                // about to be auto-healed). Keep the row, mark unhealthy.
-                await markFailure(endpoint, status).catch(() => {})
-              }
-              failures.push({ status, endpoint: endpoint.slice(0, 80) })
-              throw err
+  try {
+    const subs = await getAllSubscriptions()
+    total = subs.length
+    if (subs.length > 0) {
+      const webpush = (await import("web-push")).default
+      webpush.setVapidDetails(vapidMailto, vapidPublic!, vapidPrivate!)
+      const payload = JSON.stringify({
+        title: "🦇 BAT SIGNAL",
+        body: "Booth #7365 is SLAMMED — get back now!",
+      })
+      const results = await Promise.allSettled(
+        subs.map(async (sub) => {
+          const endpoint = (sub as PushSubscription).endpoint
+          try {
+            await webpush.sendNotification(sub as PushSubscription, payload)
+            // Successful delivery clears any prior failure flag — sub
+            // recovered, stop showing it as unhealthy.
+            await clearFailure(endpoint).catch(() => {})
+          } catch (err) {
+            const status = (err as { statusCode?: number } | null)?.statusCode ?? 0
+            if (status === 404 || status === 410) {
+              // Subscription gone for good. Prune it.
+              await removeSubscription(endpoint).catch(() => {})
+            } else if (status === 400 || status === 403 || status >= 500) {
+              // Could be transient (rate limit, brief APNS hiccup, VAPID drift
+              // about to be auto-healed). Keep the row, mark unhealthy.
+              await markFailure(endpoint, status).catch(() => {})
             }
-          })
-        )
-        pushed = results.filter((r) => r.status === "fulfilled").length
-        failed = results.filter((r) => r.status === "rejected").length
-      }
-    } catch (err) {
-      console.error("Bat-signal fan-out error:", err)
+            failures.push({ status, endpoint: endpoint.slice(0, 80) })
+            throw err
+          }
+        })
+      )
+      pushed = results.filter((r) => r.status === "fulfilled").length
+      failed = results.filter((r) => r.status === "rejected").length
     }
+  } catch (err) {
+    console.error("Bat-signal fan-out error:", err)
   }
 
-  // If we tried to fire and NOTHING got through, that's a loud failure —
-  // surface it as 502 so the UI can show "nobody received this."
-  if (wantActive && total > 0 && pushed === 0) {
+  // Decision time: if we tried to broadcast and ZERO devices got it, do NOT
+  // persist active=true. The booth might really be slammed, but pretending
+  // the signal landed is worse than telling the user it didn't — they need
+  // to escalate manually (yell, text the team, etc.). Return 502 + a clear
+  // error.
+  if (total > 0 && pushed === 0) {
     return NextResponse.json(
       {
-        error: `Bat Signal saved as active but 0/${total} devices received it. Failures: ${failures.map((f) => f.status).join(",")}.`,
-        active: true,
-        since: Date.now(),
+        error: `0/${total} devices received the Bat Signal — NOT activated. Failures: ${failures.map((f) => f.status).join(",")}.`,
+        active: false,
+        since: 0,
         pushed: 0,
         failed,
         total,
@@ -129,17 +131,31 @@ export async function POST(req: Request) {
     )
   }
 
-  // Always include the warning shape so the UI can decide how loud to be
-  // ("3 of 7 received it" is success-with-warning, not silent success).
+  // Special case: total === 0 means nobody is registered. Still flip state
+  // (so the in-app banner appears for anyone who happens to be looking) but
+  // include a loud warning so the operator knows push didn't fire.
+  const persisted = await setBatSignalState(true)
+  if (!persisted) {
+    return NextResponse.json(
+      {
+        error: "Could not persist Bat Signal state to Supabase.",
+        active: false,
+        since: 0,
+        pushed,
+        failed,
+        total,
+      },
+      { status: 500 },
+    )
+  }
+
   const state = await getBatSignalState()
   const totalNow = await countSubscriptions().catch(() => total)
-  return NextResponse.json({
-    ...state,
-    pushed,
-    failed,
-    total: totalNow,
-    warning: wantActive && failed > 0
-      ? `${failed} of ${total} devices did not receive the alert.`
-      : undefined,
-  })
+  let warning: string | undefined
+  if (totalNow === 0) {
+    warning = "Bat Signal active, but NO devices are registered to receive push. Have the team run setup."
+  } else if (failed > 0) {
+    warning = `${failed} of ${total} devices did not receive the alert.`
+  }
+  return NextResponse.json({ ...state, pushed, failed, total: totalNow, warning })
 }

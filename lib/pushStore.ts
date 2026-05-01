@@ -5,9 +5,47 @@
  * Vercel: every serverless function invocation can land on a different instance,
  * so subscribe() and sendNotification() routinely saw different (or empty) state.
  * Moving it to Supabase makes subscriptions shared across all instances.
+ *
+ * Read paths (count, get, getAll, getRegisteredNames) use the publishable
+ * client because they're called from both client + server. RLS allows anon
+ * SELECT on push_subscriptions.
+ *
+ * Write paths (addSubscription, removeSubscription, markFailure, clearFailure)
+ * use the SERVICE ROLE client. They're only ever called from server-side API
+ * routes. RLS forbids anon INSERT/UPDATE/DELETE on push_subscriptions —
+ * which means a leaked publishable key can't wipe the team's bat signal
+ * subscriber list (the round-2 review caught this exact attack).
+ *
+ * If SUPABASE_SERVICE_ROLE_KEY isn't set in the env, write paths log a loud
+ * warning and fall back to the anon client — registration works (anon INSERT
+ * via the upsert ignoreDuplicates path) but the security guarantee is lost
+ * and DELETEs/UPDATEs fail. The fallback is intentional so the app doesn't
+ * become totally non-functional during the env-var rollout window.
  */
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase"
 import type { PushSubscription as WebPushSubscription } from "web-push"
+
+let _serviceClient: SupabaseClient | null | undefined
+
+/** Returns the service-role-backed client, or anon as fallback. */
+function getWriteClient(): SupabaseClient {
+  if (_serviceClient !== undefined) return _serviceClient ?? supabase
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !serviceKey) {
+    console.warn(
+      "[pushStore] SUPABASE_SERVICE_ROLE_KEY is not set — falling back to the anon client. " +
+      "Push subscription writes will fail RLS until the env var is configured.",
+    )
+    _serviceClient = null
+    return supabase
+  }
+  _serviceClient = createClient(url, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+  return _serviceClient
+}
 
 // Serialised shape the browser gives us via PushSubscription.toJSON().
 export type StoredSubscription = {
@@ -53,7 +91,7 @@ export async function addSubscription(
   // Only set team_member if we have one — avoids clobbering an existing name
   // when an unidentified retry comes through. ("" still wipes; undefined skips.)
   if (teamMember && teamMember.trim()) row.team_member = teamMember.trim()
-  const { error } = await supabase
+  const { error } = await getWriteClient()
     .from("push_subscriptions")
     .upsert(row, { onConflict: "endpoint" })
   if (error) throw error
@@ -84,16 +122,17 @@ export async function getRegisteredNames(): Promise<string[]> {
  * stale subs on the next app open.
  */
 export async function markFailure(endpoint: string, status: number): Promise<void> {
+  const client = getWriteClient()
   // Read-then-write to bump the counter — Supabase doesn't expose an atomic
   // increment via the REST client, but we don't need atomicity here (the
   // counter is advisory display only, not a gate).
-  const { data } = await supabase
+  const { data } = await client
     .from("push_subscriptions")
     .select("failure_count")
     .eq("endpoint", endpoint)
     .maybeSingle<{ failure_count: number | null }>()
   const next = (data?.failure_count ?? 0) + 1
-  await supabase
+  await client
     .from("push_subscriptions")
     .update({
       last_failure_at: new Date().toISOString(),
@@ -109,7 +148,7 @@ export async function markFailure(endpoint: string, status: number): Promise<voi
  * in the UI.
  */
 export async function clearFailure(endpoint: string): Promise<void> {
-  await supabase
+  await getWriteClient()
     .from("push_subscriptions")
     .update({
       last_failure_at: null,
@@ -151,7 +190,7 @@ export async function getUnhealthySubs(): Promise<UnhealthySub[]> {
 }
 
 export async function removeSubscription(endpoint: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await getWriteClient()
     .from("push_subscriptions")
     .delete()
     .eq("endpoint", endpoint)

@@ -214,6 +214,13 @@ export function SetupPage() {
 
   async function enableNotifications() {
     if (enabling) return
+    // iOS gate at the function level too — even if Step 2's "locked" UI
+    // were bypassed, this prevents the requestPermission call from firing
+    // in a Safari tab where it can't actually deliver pushes.
+    if (platform === "ios" && !standalone) {
+      window.alert("Install the app to your home screen first (Step 1) — iOS only delivers push to standalone PWAs.")
+      return
+    }
     setEnabling(true)
     try {
       const result = await Notification.requestPermission()

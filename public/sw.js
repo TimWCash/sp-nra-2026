@@ -55,13 +55,22 @@ self.addEventListener("fetch", (event) => {
 
       return Promise.race([networkFetch, timeoutFetch]).catch(() => {
         if (cached) return cached
-        // No cache, no network — return a minimal offline response so the
-        // browser doesn't show its generic "no internet" page mid-session.
-        return new Response("Offline — open this app once on wifi before the show.", {
-          status: 503,
-          statusText: "Offline",
-          headers: { "Content-Type": "text/plain" },
-        })
+        // No cache, no network. Tailor the fallback to the request type —
+        // returning text/plain for an asset (CSS/JS/font/image) would cause
+        // parse errors and broken UI; only navigation gets the friendly HTML.
+        if (event.request.mode === "navigate") {
+          return new Response(
+            "<!doctype html><html><head><meta charset=\"utf-8\"><title>Offline</title>" +
+            "<style>body{font:15px/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;margin:0;padding:48px 24px;background:#0b0d12;color:#e5e7eb;text-align:center}h1{font-size:18px;margin:0 0 8px}p{color:#9ca3af;margin:0 0 24px}</style>" +
+            "</head><body><h1>You're offline</h1>" +
+            "<p>Open this app once on wifi before the show so the device can cache it.</p>" +
+            "</body></html>",
+            { status: 503, statusText: "Offline", headers: { "Content-Type": "text/html; charset=utf-8" } },
+          )
+        }
+        // For assets, let the browser handle the failure naturally — no
+        // fake 200 with text/plain pretending to be a CSS file.
+        return Response.error()
       })
     })
   )

@@ -156,21 +156,25 @@ export function SessionNotes({ sessionTitle, sessionDay, sessionCategory, sessio
       created_at: new Date().toISOString(),
     }
 
-    // 1. Optimistic local state — note appears immediately even offline.
+    // Queue the write FIRST. If storage fails (quota / private mode) we
+    // refuse to clear the draft so the user can retry without losing their text.
+    const queued = await queueNote(note)
+    if (!queued.ok) {
+      window.alert(queued.error + " Take a screenshot of this note before closing the page.")
+      setSaving(false)
+      return
+    }
+
+    // Optimistic UI now that the queue holds the note.
     setNotes((prev) => [note, ...prev.filter((n) => n.id !== note.id)])
     setDraft("")
-
-    // 2. Queue the Supabase write before attempting it. Dequeue on success.
-    queueNote(note)
     refreshPendingCount()
 
     const ok = await insertNote(supabase, note)
     if (ok) {
-      dequeueNote(note.id)
+      await dequeueNote(note.id)
       refreshPendingCount()
     }
-    // If insert failed, the note stays in the pending queue and will be
-    // retried on the next "online" event or component mount.
     setSaving(false)
   }
 
@@ -180,7 +184,7 @@ export function SessionNotes({ sessionTitle, sessionDay, sessionCategory, sessio
     setNotes((prev) => prev.filter((n) => n.id !== id))
     // Pull from the pending queue too — otherwise a deleted-while-offline note
     // would reappear once the queue flushed on reconnect.
-    dequeueNote(id)
+    await dequeueNote(id)
     refreshPendingCount()
     await supabase.from("session_notes").delete().eq("id", id)
   }

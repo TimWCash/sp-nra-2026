@@ -13,7 +13,7 @@ type FilterKey = "all" | "mine" | "hot" | "warm" | "cool" | "followUp"
 export function LeadsPage() {
   const {
     leads, stats, leaderboard, addLead, deleteLead, toggleFollowUp,
-    clearAll, exportCSV, emailLeads, copyAll,
+    exportCSV, emailLeads, copyAll,
     syncStatus, pendingCount, pendingSupabase, isSyncing, syncNow, backfillToSheet,
   } = useLeads()
   const [formOpen, setFormOpen] = useState(false)
@@ -246,11 +246,12 @@ export function LeadsPage() {
               style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}>
               <Mail size={14} /> Email
             </button>
-            <button onClick={() => { if (leads.length && confirm("Clear all " + leads.length + " leads?")) clearAll() }}
-              className="flex items-center justify-center rounded-lg text-[13px] font-semibold py-2.5 px-3 cursor-pointer transition-all duration-200 active:scale-[0.97]"
-              style={{ background: "var(--danger-light)", border: "1px solid var(--danger)", color: "var(--danger)" }}>
-              <Trash2 size={14} />
-            </button>
+            {/* Bulk delete is intentionally absent in production. The round-2/3
+                review correctly flagged it as too dangerous for a live event:
+                a single fatigued tap (or accidental DOM injection via the
+                anon key) could wipe the team's day. To remove leads, use
+                the per-row delete on each lead card instead, which goes
+                through /api/leads/[id] one at a time. */}
           </div>
         </>
       )}

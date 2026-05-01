@@ -141,10 +141,11 @@ export function TeamStatusPage() {
     return () => clearInterval(interval)
   }, [batSignal.active])
 
-  // Vibrate the phone when the bat signal flips on in the foreground. Covers
-  // the case where a teammate is looking at the app and wouldn't get a push
-  // notification. navigator.vibrate is a no-op on iOS Safari; Android honors
-  // the pattern: buzz, pause, buzz, pause, long buzz.
+  // Foreground-only nice-to-have. navigator.vibrate ONLY fires when the
+  // page is in the foreground with a recent user interaction — it cannot
+  // wake a backgrounded or pocketed phone. Off-screen alerts always come
+  // from the service-worker push handler in public/sw.js, NOT from here.
+  // (No-op entirely on iOS Safari.)
   useEffect(() => {
     const prev = prevBatActiveRef.current
     prevBatActiveRef.current = batSignal.active

@@ -17,11 +17,11 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { withLock } from "@/lib/web-lock"
 
 const CACHE_KEY = "sp_notes_cache"
 const PENDING_KEY = "sp_notes_pending"
-const SYNC_LOCK_KEY = "sp_notes_sync_lock"
-const SYNC_LOCK_TTL_MS = 30_000
+const QUEUE_LOCK = "nra-notes-queue"
 
 export type Result<T = void> = { ok: true; value?: T } | { ok: false; error: string }
 
@@ -56,21 +56,7 @@ export function loadCachedNotes(): Note[] {
   return safeParse<Note[]>(localStorage.getItem(CACHE_KEY), [])
 }
 
-// ── Flush lock ────────────────────────────────────────────────────────────
-
-function acquireLock(): boolean {
-  if (typeof window === "undefined") return false
-  const raw = localStorage.getItem(SYNC_LOCK_KEY)
-  if (raw) {
-    const heldAt = parseInt(raw, 10)
-    if (!Number.isNaN(heldAt) && Date.now() - heldAt < SYNC_LOCK_TTL_MS) return false
-  }
-  try { localStorage.setItem(SYNC_LOCK_KEY, String(Date.now())); return true } catch { return false }
-}
-
-function releaseLock(): void {
-  try { localStorage.removeItem(SYNC_LOCK_KEY) } catch { /* ignore */ }
-}
+// (Lock helper now lives in lib/web-lock.ts using the Web Locks API.)
 
 /**
  * Merge fresh server rows into the cache without dropping any cache-only
@@ -118,16 +104,20 @@ function savePending(notes: Note[]): Result {
   }
 }
 
-export function queueNote(note: Note): Result {
-  const pending = getPendingNotes()
-  if (pending.some((p) => p.id === note.id)) return { ok: true }
-  return savePending([...pending, note])
+export async function queueNote(note: Note): Promise<Result> {
+  const result = await withLock(QUEUE_LOCK, () => {
+    const pending = getPendingNotes()
+    if (pending.some((p) => p.id === note.id)) return { ok: true } as Result
+    return savePending([...pending, note])
+  })
+  return result ?? { ok: false, error: "Queue lock unavailable." }
 }
 
-export function dequeueNote(id: string): void {
-  // Re-read fresh; never write back a stale snapshot.
-  const next = getPendingNotes().filter((p) => p.id !== id)
-  try { localStorage.setItem(PENDING_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+export async function dequeueNote(id: string): Promise<void> {
+  await withLock(QUEUE_LOCK, () => {
+    const next = getPendingNotes().filter((p) => p.id !== id)
+    try { localStorage.setItem(PENDING_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+  })
 }
 
 // ── Insert + flush ────────────────────────────────────────────────────────
@@ -177,11 +167,9 @@ export async function insertNote(
  * with a stale snapshot, never loses a note added during a flush.
  */
 export async function flushPending(supabase: SupabaseClient): Promise<number> {
-  if (!acquireLock()) return 0
-  try {
+  const result = await withLock(QUEUE_LOCK, async () => {
     const snapshot = getPendingNotes()
     if (snapshot.length === 0) return 0
-
     let synced = 0
     for (const note of snapshot) {
       const ok = await insertNote(supabase, note)
@@ -192,7 +180,6 @@ export async function flushPending(supabase: SupabaseClient): Promise<number> {
       }
     }
     return synced
-  } finally {
-    releaseLock()
-  }
+  }, { ifAvailable: true })
+  return result ?? 0
 }

@@ -184,7 +184,7 @@ export function useLeads() {
 
     // Try to queue first — if storage is wedged we want to know BEFORE we
     // tell the user the lead is saved.
-    const queued = queueLead(lead)
+    const queued = await queueLead(lead)
     if (!queued.ok) {
       // Both layers failed: we couldn't even commit to the offline queue.
       // Refuse to optimistically render the lead — the user MUST know.
@@ -201,7 +201,7 @@ export function useLeads() {
 
     const insertedOk = await insertLead(supabase, lead)
     if (insertedOk) {
-      dequeueLead(lead.id)
+      await dequeueLead(lead.id)
       refreshPendingCount()
       // 3. Mirror to Google Sheet. On failure, the Sheets sync module queues
       //    the lead in its own localStorage bucket.
@@ -232,59 +232,70 @@ export function useLeads() {
     }
   }, [refreshPendingCount])
 
-  const deleteLead = useCallback(async (id: string) => {
-    // 1. Optimistic local remove — feels instant, even offline.
+  const deleteLead = useCallback(async (id: string): Promise<{ ok: boolean; error?: string }> => {
+    // Queue the delete BEFORE optimistic UI — if the queue write itself
+    // fails (storage quota), we don't want to remove the lead from view
+    // and leave the user thinking it's gone forever.
+    const queued = await queueDelete(id)
+    if (!queued.ok) {
+      return { ok: false, error: queued.error || "Could not queue delete — try again." }
+    }
+
+    // 1. Optimistic local remove.
     setLeads((prev) => prev.filter((l) => l.id !== id))
     cacheLeads(loadCachedLeads().filter((l) => l.id !== id))
-
-    // 2. Queue the delete. Anon RLS forbids DELETE, so we go through a
-    //    service-role server route.
-    queueDelete(id)
     refreshPendingCount()
 
     try {
       const res = await fetch(`/api/leads/${id}`, { method: "DELETE" })
       if (res.ok || res.status === 404) {
-        // success or already-gone — drop from queue
         await flushDeletesSupabase()
       }
     } catch {
       // offline — stays queued, will retry on next "online" event
     }
     refreshPendingCount()
+    return { ok: true }
   }, [refreshPendingCount])
 
-  const toggleFollowUp = useCallback(async (id: string, current: boolean) => {
-    // 1. Optimistic local toggle — never silently fail offline.
+  const toggleFollowUp = useCallback(async (id: string, current: boolean): Promise<{ ok: boolean; error?: string }> => {
     const updated: Lead | undefined = leads.find((l) => l.id === id)
-    if (!updated) return
+    if (!updated) return { ok: false, error: "Lead not found." }
     const next: Lead = { ...updated, followUp: !current }
 
+    // Queue first — same fail-safe principle as addLead/deleteLead. If the
+    // queue can't accept the write, the toggle was a lie.
+    const queued = await queueLead(next)
+    if (!queued.ok) {
+      return { ok: false, error: queued.error || "Could not queue follow-up toggle — try again." }
+    }
+
+    // Optimistic UI now that the queue holds it.
     setLeads((prev) => prev.map((l) => (l.id === id ? next : l)))
     cacheLeads(loadCachedLeads().map((l) => (l.id === id ? next : l)))
-
-    // 2. Queue the upsert (last-write-wins). If a follow-up was already
-    //    toggled offline and toggled again before reconnect, the queue holds
-    //    the latest state — only the final value reaches the server.
-    queueLead(next)
     refreshPendingCount()
 
     const ok = await insertLead(supabase, next)
     if (ok) {
-      dequeueLead(next.id)
+      await dequeueLead(next.id)
       refreshPendingCount()
     }
     // If the upsert failed, the lead stays queued and will be retried on the
     // next "online" event or component mount.
+    return { ok: true }
   }, [leads, refreshPendingCount])
 
   /**
-   * Bulk wipe of every lead in the database. Behind an admin gate because
-   * a stray tap during the show could nuke the team's day. The gate isn't
-   * security (the prompt is defeated by reading the source), it's a
-   * "do you really want to do this" speed bump.
+   * Bulk wipe — only available in non-production builds. The round-2/3 review
+   * correctly identified that even a confirmation phrase isn't enough during
+   * a live event. The function is preserved here for local development
+   * cleanup, gated behind NODE_ENV so production bundles never expose it.
    */
   const clearAll = useCallback(async () => {
+    if (process.env.NODE_ENV === "production") {
+      console.warn("clearAll is disabled in production builds")
+      return
+    }
     if (typeof window === "undefined") return
     const expected = "DELETE ALL LEADS"
     const entered = window.prompt(
@@ -292,8 +303,6 @@ export function useLeads() {
       `To proceed, type the phrase exactly:\n\n${expected}`,
     )
     if (entered !== expected) return
-
-    // Anon can't bulk-DELETE either — fan out via the server-side per-id route.
     const ids = leads.map((l) => l.id)
     setLeads([])
     cacheLeads([])
