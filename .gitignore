@@ -43,3 +43,6 @@ next-env.d.ts
 # stray local documents — invoices, COIs, etc. left in the project root
 *.PDF
 *.pdf
+
+# code review bundles (regenerate any time)
+code-review-bundle.md
