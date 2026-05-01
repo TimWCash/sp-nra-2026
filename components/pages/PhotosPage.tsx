@@ -76,21 +76,40 @@ export function PhotosPage() {
 
     setUploading(true)
     setUploadProgress({ done: 0, total: files.length })
+    let succeeded = 0
+    let failed = 0
     try {
       for (let i = 0; i < files.length; i++) {
         const resized = await resizeImage(files[i], 1200)
-        await supabase.from("show_photos").insert({
+        const { error } = await supabase.from("show_photos").insert({
           url: resized,
           caption: "",
           taken_by: takenBy,
         })
+        if (error) {
+          failed++
+          console.error("Photo insert error:", error)
+        } else {
+          succeeded++
+        }
         setUploadProgress({ done: i + 1, total: files.length })
       }
     } catch (err) {
+      // Catastrophic failure (e.g. resizeImage threw) — count remaining as failed.
+      failed += files.length - succeeded - failed
       console.error("Photo upload error:", err)
     } finally {
       setUploading(false)
       setUploadProgress(null)
+    }
+
+    // Don't let users walk away thinking photos uploaded if they didn't.
+    if (failed > 0) {
+      window.alert(
+        succeeded === 0
+          ? `Upload failed — none of the ${files.length} photo${files.length === 1 ? "" : "s"} reached the server. Check your connection and try again.`
+          : `${succeeded} of ${files.length} photos uploaded; ${failed} failed. Try the failed ones again when you have a stronger connection.`,
+      )
     }
   }
 

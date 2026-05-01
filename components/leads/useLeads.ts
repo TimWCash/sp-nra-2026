@@ -8,9 +8,12 @@ import {
   loadCachedLeads,
   queueLead,
   dequeueLead,
+  queueDelete,
   insertLead,
   flushPending as flushPendingSupabase,
+  flushDeletes as flushDeletesSupabase,
   getPendingCount as getPendingSupabaseCount,
+  getPendingDeleteCount,
   getPendingLeads as getPendingLeadsOffline,
 } from "@/lib/leads-offline"
 
@@ -30,21 +33,37 @@ export interface Lead {
   followUp?: boolean
 }
 
-function dbRowToLead(row: Record<string, unknown>): Lead {
+// Shape gate before the cast — if a Supabase row comes back with garbage
+// fields (schema drift, wrong table, partial migration), drop it instead
+// of crashing the render. Returns null for invalid rows so callers can
+// filter them out.
+function isValidHeat(v: unknown): v is HeatLevel {
+  return v === "hot" || v === "warm" || v === "cool"
+}
+
+function asString(v: unknown): string {
+  return typeof v === "string" ? v : ""
+}
+
+function dbRowToLead(row: Record<string, unknown>): Lead | null {
+  // Required fields. If id or name aren't strings we can't render this row
+  // at all — a missing id breaks dedupe + edit, missing name breaks UI.
+  if (typeof row.id !== "string" || typeof row.name !== "string") return null
+  const created = typeof row.created_at === "string" ? row.created_at : new Date().toISOString()
   return {
-    id: row.id as string,
-    name: row.name as string,
-    company: (row.company as string) || "",
-    role: (row.role as string) || "",
-    contact: (row.contact as string) || "",
-    notes: (row.notes as string) || "",
-    heat: (row.heat as HeatLevel) || "warm",
-    time: new Date(row.created_at as string).toLocaleString("en-US", {
+    id: row.id,
+    name: row.name,
+    company: asString(row.company),
+    role: asString(row.role),
+    contact: asString(row.contact),
+    notes: asString(row.notes),
+    heat: isValidHeat(row.heat) ? row.heat : "warm",
+    time: new Date(created).toLocaleString("en-US", {
       month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true,
     }),
-    badgePhoto: (row.badge_photo as string) || undefined,
-    capturedBy: (row.captured_by as string) || undefined,
-    followUp: (row.follow_up as boolean) || false,
+    badgePhoto: typeof row.badge_photo === "string" && row.badge_photo ? row.badge_photo : undefined,
+    capturedBy: typeof row.captured_by === "string" && row.captured_by ? row.captured_by : undefined,
+    followUp: row.follow_up === true,
   }
 }
 
@@ -58,7 +77,9 @@ export function useLeads() {
 
   const refreshPendingCount = useCallback(() => {
     setPendingCountState(getPendingCount())
-    setPendingSupabase(getPendingSupabaseCount())
+    // Both queued upserts and queued deletes count as "waiting to sync" for
+    // the user-facing banner.
+    setPendingSupabase(getPendingSupabaseCount() + getPendingDeleteCount())
   }, [])
 
   const fetchLeads = useCallback(async () => {
@@ -68,7 +89,8 @@ export function useLeads() {
       .order("created_at", { ascending: false })
 
     if (!error && data) {
-      const fetched = data.map(dbRowToLead)
+      // Drop any rows that fail validation rather than crashing the render.
+      const fetched = data.map(dbRowToLead).filter((l): l is Lead => l !== null)
       // Merge in any still-pending local leads so they don't disappear from
       // the UI while waiting to reach Supabase.
       const pendingIds = new Set(fetched.map((l) => l.id))
@@ -112,6 +134,11 @@ export function useLeads() {
           }
         }
       }
+      // Drain queued deletes too — same online event, same retry cadence.
+      if (getPendingDeleteCount() > 0) {
+        const n = await flushDeletesSupabase()
+        if (n > 0) await fetchLeads()
+      }
       if (getPendingCount() > 0) {
         await syncPending()
       }
@@ -122,7 +149,7 @@ export function useLeads() {
     return () => window.removeEventListener("online", flush)
   }, [fetchLeads, refreshPendingCount])
 
-  const addLead = useCallback(async (data: Omit<Lead, "id" | "time">) => {
+  const addLead = useCallback(async (data: Omit<Lead, "id" | "time">): Promise<{ ok: boolean; error?: string }> => {
     // Client-side id + timestamp so the lead is durable from the moment the
     // user taps Save, regardless of connectivity. Retries stay idempotent
     // because we upsert by this id.
@@ -130,6 +157,15 @@ export function useLeads() {
       ? crypto.randomUUID()
       : `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const now = new Date()
+
+    // Badge photos are base64; long ones can blow localStorage quota and cause
+    // future writes to throw. Cap at ~150KB worth of base64 (≈ 100KB binary).
+    // If the photo is too big, save the lead WITHOUT the photo and surface a
+    // warning rather than dropping the whole capture.
+    const MAX_BADGE_PHOTO_LEN = 150_000
+    const photoTooBig = data.badgePhoto && data.badgePhoto.length > MAX_BADGE_PHOTO_LEN
+    const safeBadgePhoto = photoTooBig ? undefined : data.badgePhoto
+
     const lead: Lead = {
       id,
       name: data.name,
@@ -141,17 +177,26 @@ export function useLeads() {
       time: now.toLocaleString("en-US", {
         month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true,
       }),
-      badgePhoto: data.badgePhoto,
+      badgePhoto: safeBadgePhoto,
       capturedBy: data.capturedBy,
       followUp: false,
     }
 
-    // 1. Optimistic local state — user sees the lead immediately, even offline.
+    // Try to queue first — if storage is wedged we want to know BEFORE we
+    // tell the user the lead is saved.
+    const queued = queueLead(lead)
+    if (!queued.ok) {
+      // Both layers failed: we couldn't even commit to the offline queue.
+      // Refuse to optimistically render the lead — the user MUST know.
+      return {
+        ok: false,
+        error: queued.error + " Take a screenshot or write the contact down before this screen closes.",
+      }
+    }
+
+    // Now that the queue holds the lead, optimistic UI is safe.
     setLeads((prev) => [lead, ...prev.filter((l) => l.id !== lead.id)])
     cacheLeads([lead, ...loadCachedLeads().filter((l) => l.id !== lead.id)])
-
-    // 2. Queue the Supabase write. Dequeue only on success.
-    queueLead(lead)
     refreshPendingCount()
 
     const insertedOk = await insertLead(supabase, lead)
@@ -177,19 +222,85 @@ export function useLeads() {
     // If Supabase failed, the lead stays in the pending queue and will be
     // retried on the next "online" event or component mount. The Sheets sync
     // will happen then too.
+
+    return {
+      ok: true,
+      // Surface the photo-skipped warning so the form can show it once.
+      error: photoTooBig
+        ? "Lead saved, but the badge photo was skipped to protect offline storage."
+        : undefined,
+    }
   }, [refreshPendingCount])
 
   const deleteLead = useCallback(async (id: string) => {
-    await supabase.from("nra_leads").delete().eq("id", id)
-  }, [])
+    // 1. Optimistic local remove — feels instant, even offline.
+    setLeads((prev) => prev.filter((l) => l.id !== id))
+    cacheLeads(loadCachedLeads().filter((l) => l.id !== id))
+
+    // 2. Queue the delete. Anon RLS forbids DELETE, so we go through a
+    //    service-role server route.
+    queueDelete(id)
+    refreshPendingCount()
+
+    try {
+      const res = await fetch(`/api/leads/${id}`, { method: "DELETE" })
+      if (res.ok || res.status === 404) {
+        // success or already-gone — drop from queue
+        await flushDeletesSupabase()
+      }
+    } catch {
+      // offline — stays queued, will retry on next "online" event
+    }
+    refreshPendingCount()
+  }, [refreshPendingCount])
 
   const toggleFollowUp = useCallback(async (id: string, current: boolean) => {
-    await supabase.from("nra_leads").update({ follow_up: !current }).eq("id", id)
-  }, [])
+    // 1. Optimistic local toggle — never silently fail offline.
+    const updated: Lead | undefined = leads.find((l) => l.id === id)
+    if (!updated) return
+    const next: Lead = { ...updated, followUp: !current }
 
+    setLeads((prev) => prev.map((l) => (l.id === id ? next : l)))
+    cacheLeads(loadCachedLeads().map((l) => (l.id === id ? next : l)))
+
+    // 2. Queue the upsert (last-write-wins). If a follow-up was already
+    //    toggled offline and toggled again before reconnect, the queue holds
+    //    the latest state — only the final value reaches the server.
+    queueLead(next)
+    refreshPendingCount()
+
+    const ok = await insertLead(supabase, next)
+    if (ok) {
+      dequeueLead(next.id)
+      refreshPendingCount()
+    }
+    // If the upsert failed, the lead stays queued and will be retried on the
+    // next "online" event or component mount.
+  }, [leads, refreshPendingCount])
+
+  /**
+   * Bulk wipe of every lead in the database. Behind an admin gate because
+   * a stray tap during the show could nuke the team's day. The gate isn't
+   * security (the prompt is defeated by reading the source), it's a
+   * "do you really want to do this" speed bump.
+   */
   const clearAll = useCallback(async () => {
-    await supabase.from("nra_leads").delete().neq("id", "00000000-0000-0000-0000-000000000000")
-  }, [])
+    if (typeof window === "undefined") return
+    const expected = "DELETE ALL LEADS"
+    const entered = window.prompt(
+      `This will permanently delete every lead in the database (not just yours). ` +
+      `To proceed, type the phrase exactly:\n\n${expected}`,
+    )
+    if (entered !== expected) return
+
+    // Anon can't bulk-DELETE either — fan out via the server-side per-id route.
+    const ids = leads.map((l) => l.id)
+    setLeads([])
+    cacheLeads([])
+    for (const id of ids) {
+      try { await fetch(`/api/leads/${id}`, { method: "DELETE" }) } catch {}
+    }
+  }, [leads])
 
   const exportCSV = useCallback(() => {
     if (leads.length === 0) return

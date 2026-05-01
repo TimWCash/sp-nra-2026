@@ -23,6 +23,15 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 const CACHE_KEY = "sp_nra_leads_cache"
 const PENDING_KEY = "sp_nra_leads_pending_supabase"
+const PENDING_DELETES_KEY = "sp_nra_leads_pending_deletes"
+// Mutex-ish lock so two flushes can't run concurrently (multi-tab PWA, or
+// "online" event firing alongside a manual mount-flush). Stored as a
+// timestamp so a stale lock from a tab that crashed doesn't wedge sync
+// forever.
+const SYNC_LOCK_KEY = "sp_nra_leads_sync_lock"
+const SYNC_LOCK_TTL_MS = 30_000
+
+export type Result<T = void> = { ok: true; value?: T } | { ok: false; error: string }
 
 // Data we queue for the Supabase insert. Alias of Lead today; separate name so
 // callers can distinguish "in-memory UI lead" from "lead awaiting server write."
@@ -35,14 +44,42 @@ function safeParse<T>(raw: string | null, fallback: T): T {
 
 // ── Cache of last-known server state ──────────────────────────────────────
 
-export function cacheLeads(leads: Lead[]): void {
-  if (typeof window === "undefined") return
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(leads)) } catch { /* quota */ }
+export function cacheLeads(leads: Lead[]): Result {
+  if (typeof window === "undefined") return { ok: false, error: "SSR" }
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(leads))
+    return { ok: true }
+  } catch {
+    // Quota exhaustion — cache is best-effort, not the source of truth.
+    return { ok: false, error: "Local cache full — list view may be stale." }
+  }
 }
 
 export function loadCachedLeads(): Lead[] {
   if (typeof window === "undefined") return []
   return safeParse<Lead[]>(localStorage.getItem(CACHE_KEY), [])
+}
+
+// ── Flush lock (multi-tab safety) ─────────────────────────────────────────
+
+function acquireLock(): boolean {
+  if (typeof window === "undefined") return false
+  const raw = localStorage.getItem(SYNC_LOCK_KEY)
+  if (raw) {
+    const heldAt = parseInt(raw, 10)
+    if (!Number.isNaN(heldAt) && Date.now() - heldAt < SYNC_LOCK_TTL_MS) return false
+    // Stale lock — previous holder crashed or a tab closed mid-flush. Take it.
+  }
+  try {
+    localStorage.setItem(SYNC_LOCK_KEY, String(Date.now()))
+    return true
+  } catch {
+    return false
+  }
+}
+
+function releaseLock(): void {
+  try { localStorage.removeItem(SYNC_LOCK_KEY) } catch { /* ignore */ }
 }
 
 // ── Pending Supabase writes ───────────────────────────────────────────────
@@ -56,18 +93,79 @@ export function getPendingCount(): number {
   return getPendingLeads().length
 }
 
-function savePending(leads: PendingLead[]): void {
-  localStorage.setItem(PENDING_KEY, JSON.stringify(leads))
+function savePending(leads: PendingLead[]): Result {
+  try {
+    localStorage.setItem(PENDING_KEY, JSON.stringify(leads))
+    return { ok: true }
+  } catch {
+    return { ok: false, error: "Storage full — could not save lead offline." }
+  }
 }
 
-export function queueLead(lead: PendingLead): void {
+/**
+ * Queue a lead for upsert. Last-write-wins: if an entry with this id is
+ * already in the queue (e.g. an offline-created lead the user just toggled
+ * a follow-up on), the new state replaces the old one. The same flush
+ * picks up the latest, so the team never sees stale state on reconnect.
+ *
+ * Returns Result so the caller can refuse to show "saved" if the storage
+ * write failed (quota exhausted, private browsing, etc.).
+ */
+export function queueLead(lead: PendingLead): Result {
   const pending = getPendingLeads()
-  if (pending.some((p) => p.id === lead.id)) return
-  savePending([...pending, lead])
+  const existingIdx = pending.findIndex((p) => p.id === lead.id)
+  if (existingIdx >= 0) {
+    pending[existingIdx] = lead
+    return savePending(pending)
+  }
+  return savePending([...pending, lead])
 }
 
 export function dequeueLead(id: string): void {
-  savePending(getPendingLeads().filter((p) => p.id !== id))
+  // Re-read fresh — never write a stale snapshot back over an item the
+  // user added during a flush.
+  const next = getPendingLeads().filter((p) => p.id !== id)
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+}
+
+// ── Pending deletes ──────────────────────────────────────────────────────
+//
+// Anon RLS forbids DELETE, so deletes go through /api/leads/[id] (which
+// uses the service role key). Deletes that fail offline get queued here
+// and retried on reconnect.
+
+export function getPendingDeleteIds(): string[] {
+  if (typeof window === "undefined") return []
+  return safeParse<string[]>(localStorage.getItem(PENDING_DELETES_KEY), [])
+}
+
+export function getPendingDeleteCount(): number {
+  return getPendingDeleteIds().length
+}
+
+function savePendingDeletes(ids: string[]): Result {
+  try {
+    localStorage.setItem(PENDING_DELETES_KEY, JSON.stringify(ids))
+    return { ok: true }
+  } catch {
+    return { ok: false, error: "Storage full — could not record delete offline." }
+  }
+}
+
+export function queueDelete(id: string): Result {
+  // If the lead is still in the upsert queue (offline-created, never synced),
+  // a delete means "user changed their mind" — drop from the upsert queue
+  // entirely so we never push it to the server in the first place.
+  dequeueLead(id)
+
+  const ids = getPendingDeleteIds()
+  if (ids.includes(id)) return { ok: true }
+  return savePendingDeletes([...ids, id])
+}
+
+export function dequeueDelete(id: string): void {
+  const next = getPendingDeleteIds().filter((x) => x !== id)
+  try { localStorage.setItem(PENDING_DELETES_KEY, JSON.stringify(next)) } catch { /* ignore */ }
 }
 
 // ── Insert + flush ────────────────────────────────────────────────────────
@@ -101,39 +199,87 @@ function toRow(lead: Lead): LeadInsertRow {
 }
 
 /**
- * Try to insert a single lead into Supabase. Returns true on success.
- * The caller decides whether to queue on failure.
+ * Try to upsert a single lead into Supabase. Returns true on success.
+ *
+ * Used by both addLead (insert) and toggleFollowUp (update) — Postgres's
+ * INSERT ... ON CONFLICT DO UPDATE handles both cases. The anon RLS policy
+ * grants SELECT/INSERT/UPDATE (but not DELETE) so this works from the
+ * client without going through a server route.
  */
 export async function insertLead(
   supabase: SupabaseClient,
   lead: Lead,
 ): Promise<boolean> {
-  // upsert by id with ignoreDuplicates so a retried offline insert can't
-  // produce duplicates if the row somehow got through a previous attempt,
-  // and so we don't accidentally do an UPDATE under tighter RLS.
   const { error } = await supabase
     .from("nra_leads")
-    .upsert(toRow(lead), { onConflict: "id", ignoreDuplicates: true })
+    .upsert(toRow(lead), { onConflict: "id" })
   return !error
 }
 
 /**
- * Drain the pending queue into Supabase. Returns the count of successful inserts.
- * Leaves any that fail in the queue for the next attempt.
+ * Drain the pending upsert queue into Supabase. Returns the count of
+ * successful upserts. Anything that fails stays in the queue for the next
+ * attempt.
+ *
+ * Race-safety:
+ * - Acquires a localStorage flush lock so two flushes (e.g. mount + online
+ *   event firing simultaneously, or a second tab in the same PWA) can't
+ *   step on each other.
+ * - Re-reads the queue right before each save so a queueLead call that
+ *   lands DURING the flush isn't clobbered by a stale in-memory snapshot.
+ * - Removes only the IDs we actually synced — never replaces the full
+ *   queue with an old snapshot.
  */
 export async function flushPending(supabase: SupabaseClient): Promise<number> {
-  const pending = getPendingLeads()
-  if (pending.length === 0) return 0
+  if (!acquireLock()) return 0
+  try {
+    const snapshot = getPendingLeads()
+    if (snapshot.length === 0) return 0
 
-  let synced = 0
-  const stillPending: PendingLead[] = []
-
-  for (const lead of pending) {
-    const ok = await insertLead(supabase, lead)
-    if (ok) synced++
-    else stillPending.push(lead)
+    let synced = 0
+    for (const lead of snapshot) {
+      const ok = await insertLead(supabase, lead)
+      if (ok) {
+        // Re-read + filter — anything queued during the flush stays put.
+        const next = getPendingLeads().filter((p) => p.id !== lead.id)
+        try { localStorage.setItem(PENDING_KEY, JSON.stringify(next)) } catch { /* keep going */ }
+        synced++
+      }
+    }
+    return synced
+  } finally {
+    releaseLock()
   }
+}
 
-  savePending(stillPending)
-  return synced
+/**
+ * Drain the pending-deletes queue. Each id is sent to /api/leads/[id]
+ * (server-side service-role delete). Returns the count of successful
+ * deletes. Failures stay queued. Same lock + re-read pattern as upserts.
+ */
+export async function flushDeletes(): Promise<number> {
+  if (!acquireLock()) return 0
+  try {
+    const ids = getPendingDeleteIds()
+    if (ids.length === 0) return 0
+
+    let synced = 0
+    for (const id of ids) {
+      let didSucceed = false
+      try {
+        const res = await fetch(`/api/leads/${id}`, { method: "DELETE" })
+        // 404 = already gone; treat as success so we stop retrying.
+        didSucceed = res.ok || res.status === 404
+      } catch { /* network failure — keep queued */ }
+
+      if (didSucceed) {
+        const next = getPendingDeleteIds().filter((x) => x !== id)
+        try { localStorage.setItem(PENDING_DELETES_KEY, JSON.stringify(next)) } catch { /* keep going */ }
+        synced++
+      }
+    }
+    return synced
+  } finally {
+    releaseLock()
+  }
 }

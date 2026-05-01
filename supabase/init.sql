@@ -39,14 +39,36 @@ create table if not exists public.session_notes (
 
 -- ── Push subscriptions (Bat Signal) ──────────────────────────────────────
 create table if not exists public.push_subscriptions (
-  endpoint     text primary key,
-  subscription jsonb not null,
-  team_member  text default '',  -- the teammate this device belongs to (display only)
-  last_used_at timestamptz default now()
+  endpoint           text primary key,
+  subscription       jsonb not null,
+  team_member        text default '',  -- the teammate this device belongs to (display only)
+  last_used_at       timestamptz default now(),
+  -- Health tracking. Don't auto-prune on first 400/403 — those can be
+  -- transient (rate limiting, brief APNS hiccup). Mark and let the next
+  -- successful test/heal clear the failure.
+  last_failure_at    timestamptz,
+  last_failure_status int,
+  failure_count      int default 0
 );
--- For existing projects that pre-date the team_member column:
-alter table public.push_subscriptions
-  add column if not exists team_member text default '';
+-- For existing projects that pre-date these columns:
+alter table public.push_subscriptions add column if not exists team_member text default '';
+alter table public.push_subscriptions add column if not exists last_failure_at timestamptz;
+alter table public.push_subscriptions add column if not exists last_failure_status int;
+alter table public.push_subscriptions add column if not exists failure_count int default 0;
+
+-- ── Bat Signal state ─────────────────────────────────────────────────────
+-- Was an in-memory module-level let on the route, which silently broke on
+-- Vercel: each serverless invocation can land on a different instance, so
+-- the state two consecutive requests saw could differ. Moving to Supabase
+-- so the state is consistent across instances and across page loads.
+create table if not exists public.bat_signal_state (
+  id     int primary key default 1 check (id = 1),  -- only ever one row
+  active boolean not null default false,
+  since  timestamptz
+);
+insert into public.bat_signal_state (id, active, since)
+  values (1, false, null)
+  on conflict (id) do nothing;
 
 -- ── Team travel (flights + accommodation, edited from Team page) ─────────
 create table if not exists public.team_travel (
@@ -78,26 +100,92 @@ create table if not exists public.podcast_bookings (
   unique (day, time)               -- enforces "slot already booked" 23505 path in app
 );
 
--- ── RLS: this app uses the anon key directly from the browser. Tables are
--- not sensitive (no PII beyond names/emails the team chooses to capture for
--- a single trade show). With the new sb_publishable_* keys Supabase rolled
--- out, just disabling RLS no longer permits anon writes — you have to leave
--- RLS enabled and add explicit policies. So: enable RLS + allow-everything
--- policy for anon and authenticated.
+-- ── RLS: this app uses the anon key directly from the browser. With the new
+-- sb_publishable_* keys, RLS is enforced regardless of the table's "disable
+-- RLS" setting, so we leave RLS on and add explicit policies.
+--
+-- Threat model: the anon key is shipped in the client bundle, so anyone with
+-- a browser can hit the API as the anon role. The biggest data asset is the
+-- leads table — losing leads = losing the show. So:
+--   - nra_leads:          anon = SELECT, INSERT, UPDATE. NO DELETE.
+--                         (deleteLead goes via /api/leads/[id] using the
+--                         service role key.)
+--   - push_subscriptions: anon = SELECT, INSERT, UPDATE, DELETE.
+--                         The server routes (/api/push/subscribe + bat-signal)
+--                         use the anon client, so locking down anon writes
+--                         would break registration. Sub spam isn't a real
+--                         threat: the endpoint validates shape, and any
+--                         garbage subs auto-prune on the next bat signal
+--                         (404/410 from APNS/FCM).
+--   - session_notes,
+--     show_photos,
+--     podcast_bookings,
+--     team_travel:        anon = SELECT, INSERT, UPDATE, DELETE.
+--                         (Accepting anon DELETE on these as a known risk
+--                         for the show — they're recoverable inconveniences,
+--                         and moving each to its own service-role route is
+--                         a 17-day timeline budget call.)
+--   - bat_signal_state:   anon = SELECT, UPDATE only (one row, never deleted).
+--   - authenticated: full access on every table (Supabase dashboard cleanup).
 do $$
-declare tbl text;
+declare
+  tbl text;
+  -- Tables where anon DELETE is acceptable (recoverable inconveniences).
+  -- nra_leads is intentionally NOT here — bulk delete is the catastrophic
+  -- failure mode we're guarding against.
+  delete_ok_tbls text[] := array[
+    'session_notes','show_photos','podcast_bookings','team_travel',
+    'push_subscriptions'
+  ];
+  update_ok_tbls text[] := array[
+    'nra_leads','team_travel','bat_signal_state','session_notes',
+    'show_photos','podcast_bookings','push_subscriptions'
+  ];
 begin
   foreach tbl in array array[
     'nra_leads','session_notes','push_subscriptions',
-    'team_travel','show_photos','podcast_bookings'
+    'team_travel','show_photos','podcast_bookings','bat_signal_state'
   ] loop
     execute format('alter table public.%I enable row level security', tbl);
+
+    -- Wipe any older policies before redefining (idempotent re-runs).
     execute format('drop policy if exists "anon_full_access" on public.%I', tbl);
+    execute format('drop policy if exists "auth_full_access" on public.%I', tbl);
+    execute format('drop policy if exists "anon_select" on public.%I', tbl);
+    execute format('drop policy if exists "anon_insert" on public.%I', tbl);
+    execute format('drop policy if exists "anon_update" on public.%I', tbl);
+    execute format('drop policy if exists "anon_delete" on public.%I', tbl);
+
+    -- Everyone gets SELECT.
     execute format(
-      'create policy "anon_full_access" on public.%I for all to anon using (true) with check (true)',
+      'create policy "anon_select" on public.%I for select to anon using (true)',
       tbl
     );
-    execute format('drop policy if exists "auth_full_access" on public.%I', tbl);
+
+    -- INSERT on every table the app writes (everything except bat_signal_state,
+    -- which is upsert-by-id-1 and pre-seeded).
+    if tbl <> 'bat_signal_state' then
+      execute format(
+        'create policy "anon_insert" on public.%I for insert to anon with check (true)',
+        tbl
+      );
+    end if;
+
+    if tbl = any(update_ok_tbls) then
+      execute format(
+        'create policy "anon_update" on public.%I for update to anon using (true) with check (true)',
+        tbl
+      );
+    end if;
+
+    if tbl = any(delete_ok_tbls) then
+      execute format(
+        'create policy "anon_delete" on public.%I for delete to anon using (true)',
+        tbl
+      );
+    end if;
+
+    -- Authenticated bypass for dashboard cleanup.
     execute format(
       'create policy "auth_full_access" on public.%I for all to authenticated using (true) with check (true)',
       tbl
@@ -108,18 +196,27 @@ end $$;
 -- ── Realtime: the app subscribes to postgres_changes on these tables so
 -- one teammate's edit shows up on every other device within a second.
 -- Adding to the supabase_realtime publication is what enables that.
+--
+-- This block is idempotent: if a table is already in the publication, ALTER
+-- PUBLICATION ADD TABLE errors. We catch each one individually via a DO
+-- block + EXCEPTION clause so re-running this script is safe.
 do $$
+declare tbl text;
 begin
-  if not exists (
-    select 1 from pg_publication where pubname = 'supabase_realtime'
-  ) then
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
     create publication supabase_realtime;
   end if;
-end $$;
 
-alter publication supabase_realtime add table public.nra_leads;
-alter publication supabase_realtime add table public.session_notes;
-alter publication supabase_realtime add table public.team_travel;
-alter publication supabase_realtime add table public.show_photos;
-alter publication supabase_realtime add table public.podcast_bookings;
--- (push_subscriptions intentionally NOT in realtime — server-side only)
+  foreach tbl in array array[
+    'nra_leads','session_notes','team_travel','show_photos',
+    'podcast_bookings','bat_signal_state'
+  ] loop
+    -- (push_subscriptions intentionally NOT in realtime — server-side only)
+    begin
+      execute format('alter publication supabase_realtime add table public.%I', tbl);
+    exception
+      when duplicate_object then null;  -- already in the publication, fine.
+      when others then null;            -- unknown table, ignore (e.g. partial schema).
+    end;
+  end loop;
+end $$;

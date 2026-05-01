@@ -10,6 +10,22 @@ import type { Lead } from "@/components/leads/useLeads"
 
 const PENDING_KEY = "sp_nra_sheets_pending"
 const SYNCED_KEY = "sp_nra_sheets_synced"
+const SYNC_LOCK_KEY = "sp_nra_sheets_sync_lock"
+const SYNC_LOCK_TTL_MS = 60_000  // longer than leads — Sheets API can be slow
+
+function acquireLock(): boolean {
+  if (typeof window === "undefined") return false
+  const raw = localStorage.getItem(SYNC_LOCK_KEY)
+  if (raw) {
+    const heldAt = parseInt(raw, 10)
+    if (!Number.isNaN(heldAt) && Date.now() - heldAt < SYNC_LOCK_TTL_MS) return false
+  }
+  try { localStorage.setItem(SYNC_LOCK_KEY, String(Date.now())); return true } catch { return false }
+}
+
+function releaseLock(): void {
+  try { localStorage.removeItem(SYNC_LOCK_KEY) } catch { /* ignore */ }
+}
 
 /** IDs of leads that have been synced successfully. */
 export function getSyncedIds(): Set<string> {
@@ -23,7 +39,7 @@ export function getSyncedIds(): Set<string> {
 }
 
 function saveSyncedIds(ids: Set<string>) {
-  localStorage.setItem(SYNCED_KEY, JSON.stringify([...ids]))
+  try { localStorage.setItem(SYNCED_KEY, JSON.stringify([...ids])) } catch { /* quota; advisory only */ }
 }
 
 /** Leads waiting to be synced (failed or offline). */
@@ -37,8 +53,13 @@ export function getPendingLeads(): Lead[] {
   }
 }
 
-function savePendingLeads(leads: Lead[]) {
-  localStorage.setItem(PENDING_KEY, JSON.stringify(leads))
+function savePendingLeads(leads: Lead[]): { ok: boolean; error?: string } {
+  try {
+    localStorage.setItem(PENDING_KEY, JSON.stringify(leads))
+    return { ok: true }
+  } catch {
+    return { ok: false, error: "Storage full — could not queue Sheets sync." }
+  }
 }
 
 export type SyncStatus = "idle" | "syncing" | "synced" | "pending" | "error" | "no-config"
@@ -72,7 +93,8 @@ async function postLead(lead: Lead): Promise<boolean> {
 
 /**
  * Sync a newly-added lead to Google Sheets.
- * On failure the lead is queued for retry.
+ * On failure the lead is queued for retry. Per-id remove on success — never
+ * replaces the full queue.
  */
 export async function syncLead(lead: Lead): Promise<boolean> {
   const ok = await postLead(lead)
@@ -80,11 +102,12 @@ export async function syncLead(lead: Lead): Promise<boolean> {
     const ids = getSyncedIds()
     ids.add(lead.id)
     saveSyncedIds(ids)
+    // Re-read fresh; only drop this specific id so concurrent queues don't lose data.
     savePendingLeads(getPendingLeads().filter((p) => p.id !== lead.id))
     return true
   }
 
-  // Failed — queue for retry
+  // Failed — queue for retry. Re-read so we don't clobber a parallel write.
   const pending = getPendingLeads()
   if (!pending.some((p) => p.id === lead.id)) {
     savePendingLeads([...pending, lead])
@@ -93,34 +116,40 @@ export async function syncLead(lead: Lead): Promise<boolean> {
 }
 
 /**
- * Retry all queued (pending) leads.
- * Returns the number of successfully synced leads.
+ * Retry all queued (pending) leads. Lock + per-id remove so a concurrent
+ * syncLead call (e.g. user adds a new lead during the flush) can't lose
+ * the new entry.
  */
 export async function syncPending(): Promise<number> {
-  const pending = getPendingLeads()
-  if (pending.length === 0) return 0
+  if (!acquireLock()) return 0
+  try {
+    const snapshot = getPendingLeads()
+    if (snapshot.length === 0) return 0
 
-  let synced = 0
-  const stillPending: Lead[] = []
-  const syncedIds = getSyncedIds()
+    let synced = 0
+    const syncedIds = getSyncedIds()
 
-  for (const lead of pending) {
-    if (syncedIds.has(lead.id)) {
-      synced++
-      continue
+    for (const lead of snapshot) {
+      if (syncedIds.has(lead.id)) {
+        // Stale queue entry — already on the sheet. Just remove it.
+        savePendingLeads(getPendingLeads().filter((p) => p.id !== lead.id))
+        synced++
+        continue
+      }
+      const ok = await postLead(lead)
+      if (ok) {
+        syncedIds.add(lead.id)
+        savePendingLeads(getPendingLeads().filter((p) => p.id !== lead.id))
+        synced++
+      }
+      // failure: leave in queue for next run, don't touch the queue at all
     }
-    const ok = await postLead(lead)
-    if (ok) {
-      syncedIds.add(lead.id)
-      synced++
-    } else {
-      stillPending.push(lead)
-    }
+
+    saveSyncedIds(syncedIds)
+    return synced
+  } finally {
+    releaseLock()
   }
-
-  saveSyncedIds(syncedIds)
-  savePendingLeads(stillPending)
-  return synced
 }
 
 /**

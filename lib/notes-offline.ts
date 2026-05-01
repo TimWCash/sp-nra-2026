@@ -20,6 +20,10 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 const CACHE_KEY = "sp_notes_cache"
 const PENDING_KEY = "sp_notes_pending"
+const SYNC_LOCK_KEY = "sp_notes_sync_lock"
+const SYNC_LOCK_TTL_MS = 30_000
+
+export type Result<T = void> = { ok: true; value?: T } | { ok: false; error: string }
 
 export type Note = {
   id: string
@@ -37,14 +41,35 @@ function safeParse<T>(raw: string | null, fallback: T): T {
 
 // ── Local cache of last-known server state ────────────────────────────────
 
-export function cacheNotes(notes: Note[]): void {
-  if (typeof window === "undefined") return
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(notes)) } catch { /* quota */ }
+export function cacheNotes(notes: Note[]): Result {
+  if (typeof window === "undefined") return { ok: false, error: "SSR" }
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(notes))
+    return { ok: true }
+  } catch {
+    return { ok: false, error: "Local cache full." }
+  }
 }
 
 export function loadCachedNotes(): Note[] {
   if (typeof window === "undefined") return []
   return safeParse<Note[]>(localStorage.getItem(CACHE_KEY), [])
+}
+
+// ── Flush lock ────────────────────────────────────────────────────────────
+
+function acquireLock(): boolean {
+  if (typeof window === "undefined") return false
+  const raw = localStorage.getItem(SYNC_LOCK_KEY)
+  if (raw) {
+    const heldAt = parseInt(raw, 10)
+    if (!Number.isNaN(heldAt) && Date.now() - heldAt < SYNC_LOCK_TTL_MS) return false
+  }
+  try { localStorage.setItem(SYNC_LOCK_KEY, String(Date.now())); return true } catch { return false }
+}
+
+function releaseLock(): void {
+  try { localStorage.removeItem(SYNC_LOCK_KEY) } catch { /* ignore */ }
 }
 
 /**
@@ -84,18 +109,25 @@ export function getPendingCountForSession(sessionDay: string, sessionTitle: stri
   ).length
 }
 
-function savePending(notes: Note[]): void {
-  localStorage.setItem(PENDING_KEY, JSON.stringify(notes))
+function savePending(notes: Note[]): Result {
+  try {
+    localStorage.setItem(PENDING_KEY, JSON.stringify(notes))
+    return { ok: true }
+  } catch {
+    return { ok: false, error: "Storage full — could not save note offline." }
+  }
 }
 
-export function queueNote(note: Note): void {
+export function queueNote(note: Note): Result {
   const pending = getPendingNotes()
-  if (pending.some((p) => p.id === note.id)) return
-  savePending([...pending, note])
+  if (pending.some((p) => p.id === note.id)) return { ok: true }
+  return savePending([...pending, note])
 }
 
 export function dequeueNote(id: string): void {
-  savePending(getPendingNotes().filter((p) => p.id !== id))
+  // Re-read fresh; never write back a stale snapshot.
+  const next = getPendingNotes().filter((p) => p.id !== id)
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(next)) } catch { /* ignore */ }
 }
 
 // ── Insert + flush ────────────────────────────────────────────────────────
@@ -141,21 +173,26 @@ export async function insertNote(
 
 /**
  * Drain the pending queue into Supabase. Returns the count of successful
- * inserts. Anything that fails stays in the queue for the next attempt.
+ * inserts. Lock + per-id remove pattern: never replaces the full queue
+ * with a stale snapshot, never loses a note added during a flush.
  */
 export async function flushPending(supabase: SupabaseClient): Promise<number> {
-  const pending = getPendingNotes()
-  if (pending.length === 0) return 0
+  if (!acquireLock()) return 0
+  try {
+    const snapshot = getPendingNotes()
+    if (snapshot.length === 0) return 0
 
-  let synced = 0
-  const stillPending: Note[] = []
-
-  for (const note of pending) {
-    const ok = await insertNote(supabase, note)
-    if (ok) synced++
-    else stillPending.push(note)
+    let synced = 0
+    for (const note of snapshot) {
+      const ok = await insertNote(supabase, note)
+      if (ok) {
+        const next = getPendingNotes().filter((p) => p.id !== note.id)
+        try { localStorage.setItem(PENDING_KEY, JSON.stringify(next)) } catch { /* keep going */ }
+        synced++
+      }
+    }
+    return synced
+  } finally {
+    releaseLock()
   }
-
-  savePending(stillPending)
-  return synced
 }

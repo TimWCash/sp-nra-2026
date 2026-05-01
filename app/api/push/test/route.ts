@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getSubscription, removeSubscription } from "@/lib/pushStore"
+import { getSubscription, removeSubscription, markFailure, clearFailure } from "@/lib/pushStore"
 
 /**
  * Sends a single test push notification to the provided subscription endpoint.
@@ -50,6 +50,9 @@ export async function POST(req: Request) {
       body: "This is how alerts will feel during the show.",
     })
     await webpush.sendNotification(sub, payload)
+    // Successful delivery — wipe any prior failure flag so the sub stops
+    // showing as unhealthy in TeamStatusPage.
+    await clearFailure(endpoint).catch(() => {})
     return NextResponse.json({ ok: true })
   } catch (err) {
     const e = err as { statusCode?: number; body?: string; headers?: Record<string, string> } | null
@@ -63,16 +66,31 @@ export async function POST(req: Request) {
       message: err instanceof Error ? err.message : String(err),
     })
 
-    // 404/410: gone. APNS/FCM have forgotten this endpoint. Re-subscribe will fix it.
-    // 400/403: also commonly fixed by re-subscribing — 400 can mean stale/malformed
-    // subscription state on the platform side, 403 can mean a VAPID identifier mismatch
-    // that gets re-issued with the fresh sub. Treat them all as "refresh and retry."
-    if (status === 400 || status === 403 || status === 404 || status === 410) {
+    // 404/410: subscription is gone for good — APNS/FCM have forgotten it.
+    // Prune from the DB and tell the client to re-subscribe.
+    if (status === 404 || status === 410) {
       await removeSubscription(endpoint)
       return NextResponse.json(
         {
           error: "Push subscription expired. Refreshing…",
           expired: true,
+          detail: body,
+          upstreamStatus: status,
+        },
+        { status: 410 }
+      )
+    }
+    // 400/403: probably a stale VAPID pairing or platform hiccup. We DO NOT
+    // prune the row — that would silently disappear the teammate from the
+    // team list and make them miss every future bat signal. Instead, mark
+    // unhealthy and tell the client to refresh; if the refresh works, the
+    // next push will clear the failure flag automatically.
+    if (status === 400 || status === 403) {
+      await markFailure(endpoint, status).catch(() => {})
+      return NextResponse.json(
+        {
+          error: "Push subscription needs a refresh.",
+          expired: true,  // tell the client to re-subscribe
           detail: body,
           upstreamStatus: status,
         },

@@ -69,7 +69,7 @@ export function LeadsPage() {
         ? `Retry (${pendingCount})`
         : "Sheet")
 
-  function handleSave(data: Parameters<typeof addLead>[0]) {
+  async function handleSave(data: Parameters<typeof addLead>[0]) {
     // Duplicate detection
     const dupe = leads.find((l) =>
       l.name.toLowerCase() === data.name.toLowerCase() ||
@@ -78,7 +78,17 @@ export function LeadsPage() {
     if (dupe) {
       if (!confirm(`"${dupe.name}" might already be in your leads. Save anyway?`)) return
     }
-    addLead(data)
+    const result = await addLead(data)
+    if (!result.ok) {
+      // Save genuinely failed — block the user with the error so the lead
+      // is never silently lost.
+      window.alert(result.error || "Could not save lead. Take a screenshot or write the contact down before closing this screen.")
+      return
+    }
+    if (result.error) {
+      // Save succeeded but with a warning (e.g. photo skipped). Non-blocking.
+      window.alert(result.error)
+    }
   }
 
   const myCount = leads.filter((l) => l.capturedBy === myName).length

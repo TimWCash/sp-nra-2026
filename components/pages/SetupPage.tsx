@@ -150,8 +150,10 @@ export function SetupPage() {
   const [userName, setUserName] = useState("")
 
   const detect = useCallback(async () => {
-    setPlatform(detectPlatform())
-    setStandalone(detectStandalone())
+    const plat = detectPlatform()
+    const standaloneNow = detectStandalone()
+    setPlatform(plat)
+    setStandalone(standaloneNow)
 
     if (!("Notification" in window) || !("serviceWorker" in navigator)) {
       setNotifPermission("unsupported")
@@ -160,13 +162,30 @@ export function SetupPage() {
     }
     setNotifPermission(Notification.permission)
 
+    // iOS install gate: don't try to verify or heal a sub on a Safari tab —
+    // iOS only fires push when the app is added to the home screen, and
+    // attempting subscribe before that gives confusing errors.
+    if (plat === "ios" && !standaloneNow) {
+      setHasPushSub(false)
+      return
+    }
+
     try {
-      // Heal any VAPID drift BEFORE we report hasPushSub, so the "✅ ready"
-      // state reflects a sub that will actually work.
+      // First heal any VAPID drift (server-rotated public key) silently.
       await healVapidDrift()
       const reg = await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.getSubscription()
-      setHasPushSub(!!sub)
+      const browserSub = await reg.pushManager.getSubscription()
+      if (!browserSub) {
+        setHasPushSub(false)
+        return
+      }
+      // Browser has a sub — verify the SERVER also has it. If only the
+      // browser knows about it (e.g. project migrated, server got wiped),
+      // re-register silently. subscribeToPush() returns null if the server
+      // refuses, in which case Step 3 turns red rather than showing a
+      // phantom green check.
+      const verified = await subscribeToPush()
+      setHasPushSub(!!verified)
     } catch {
       setHasPushSub(false)
     }

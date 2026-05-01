@@ -44,10 +44,29 @@ Return only valid JSON, no markdown, no explanation.`,
       ],
     })
 
-    const text = response.content[0].type === "text" ? response.content[0].text : ""
+    // Defensive read — Claude can occasionally return an empty content array
+    // or a non-text first block. Treat any of those as "scan didn't find
+    // anything" rather than crashing into the catch block.
+    const firstBlock = response.content?.[0]
+    const text = firstBlock && firstBlock.type === "text" ? firstBlock.text : ""
+
     // Strip markdown code blocks if present
     const cleaned = text.trim().replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "")
-    const parsed = JSON.parse(cleaned)
+
+    let parsed: Record<string, string> = {}
+    if (cleaned) {
+      try {
+        const raw = JSON.parse(cleaned)
+        if (raw && typeof raw === "object") {
+          // Coerce every field to string so downstream callers don't get null/undefined.
+          for (const k of ["name", "title", "company", "email", "phone", "notes"]) {
+            parsed[k] = typeof raw[k] === "string" ? raw[k] : ""
+          }
+        }
+      } catch {
+        // Not valid JSON — fall through with empty parsed; user fills in manually.
+      }
+    }
 
     // Build a LinkedIn Google search URL from name + company
     const query = [parsed.name, parsed.company].filter(Boolean).join(" ")
