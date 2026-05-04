@@ -330,6 +330,25 @@ export function SetupPage() {
         Run this once before the show so your phone buzzes when the booth needs backup.
       </p>
 
+      {/* Booth reference render — what we're building toward at McCormick.
+          Helps teammates orient on setup day and pre-show. */}
+      <div className="rounded-2xl mb-4 overflow-hidden"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+        <img
+          src="/booth-render.png"
+          alt="Service Physics booth #7365 — NRA Show 2026 final layout"
+          className="w-full block"
+          style={{ aspectRatio: "1028 / 396", objectFit: "cover" }}
+          loading="lazy"
+        />
+        <div className="px-4 py-3 text-[12px]" style={{ color: "var(--text-secondary)" }}>
+          <div className="font-bold mb-0.5" style={{ color: "var(--text)" }}>
+            Booth #7365 · NRA Show 2026
+          </div>
+          What the booth should look like once load-in is complete.
+        </div>
+      </div>
+
       {allReady && (
         <div className="rounded-xl p-4 mb-4 flex items-center gap-2.5"
           style={{ background: "var(--success-light)", color: "var(--success)" }}>
