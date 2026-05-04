@@ -18,6 +18,18 @@ export function BoothPage() {
     <div className="animate-fade-in">
       <h1 className="text-xl font-bold mb-4" style={{ color: "var(--text)" }}>Booth #7365</h1>
 
+      {/* Booth render — hero reference image of the finished build. */}
+      <div className="rounded-2xl mb-4 overflow-hidden"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+        <img
+          src="/booth-render.png"
+          alt="Service Physics booth #7365 — NRA Show 2026 final layout"
+          className="w-full block"
+          style={{ aspectRatio: "1028 / 396", objectFit: "cover" }}
+          loading="lazy"
+        />
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-4 gap-2 mb-4">
         {[
