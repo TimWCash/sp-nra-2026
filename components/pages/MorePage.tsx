@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Copy, Mail, Users, MessageCircle, Activity, Truck, ChevronRight, HelpCircle, ChevronDown, StickyNote, Camera, PackageOpen, PackageCheck } from "lucide-react"
+import { Copy, Mail, Users, MessageCircle, Activity, Truck, ChevronRight, HelpCircle, ChevronDown, StickyNote, Camera, PackageOpen, PackageCheck, Smartphone, ExternalLink } from "lucide-react"
 import { keyDates, emailTemplate } from "@/lib/data"
 import { supabase } from "@/lib/supabase"
 import type { PageId } from "@/components/layout/BottomNav"
@@ -209,6 +209,41 @@ export function MorePage({ onNavigate }: MorePageProps) {
         style={{ background: "var(--surface-alt)", border: "1px solid var(--border)", color: "var(--text)" }}>
         <Copy size={14} /> {copyLabel}
       </button>
+
+      {/* Show To Go — the official NRA app. Has the floor map, exhibitor
+          list, full schedule with NRA's own networking features. Lives
+          alongside this app, not as a replacement. */}
+      <SectionLabel>Official NRA App</SectionLabel>
+      <div className="rounded-xl p-4 mb-6"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: "var(--accent-light)" }}>
+            <Smartphone size={18} style={{ color: "var(--accent)" }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold" style={{ color: "var(--text)" }}>Show To Go</div>
+            <div className="text-[12px] mt-0.5 leading-snug" style={{ color: "var(--text-muted)" }}>
+              NRA&apos;s official app. Floor map, full exhibitor list, session search.
+              Worth installing alongside this one.
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <a href="https://apps.apple.com/search?term=NRA+Show+To+Go"
+            target="_blank" rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-[12px] font-bold no-underline active:scale-[0.97] transition-all"
+            style={{ background: "var(--text)", color: "var(--surface)" }}>
+            <ExternalLink size={12} /> App Store
+          </a>
+          <a href="https://play.google.com/store/search?q=NRA+Show+To+Go&c=apps"
+            target="_blank" rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-[12px] font-bold no-underline active:scale-[0.97] transition-all"
+            style={{ background: "var(--text)", color: "var(--surface)" }}>
+            <ExternalLink size={12} /> Google Play
+          </a>
+        </div>
+      </div>
 
       {/* How To Use (moved to the very bottom) */}
       <SectionLabel>How to Use This App</SectionLabel>
