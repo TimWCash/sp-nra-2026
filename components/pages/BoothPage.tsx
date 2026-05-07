@@ -1,8 +1,21 @@
 "use client"
 
 import { useState } from "react"
-import { MapPin, AlertTriangle } from "lucide-react"
+import { MapPin, AlertTriangle, Phone } from "lucide-react"
 import { boothSetup, boothRules } from "@/lib/data"
+
+// Our floor manager. Booth #7365 is in North Hall aisle 73, which falls in
+// the 6800-8200 / 8800-9200 range per the NRA 2026 floor-manager directory.
+// Phones are landlines (no SMS) and only go live Wed May 13.
+const FLOOR_MANAGER = {
+  name: "Gayle Alldredge",
+  zone: "North Hall · Aisles 6800-8200 & 8800-9200",
+  desk: "Across from booth 8901",
+  phone: "312-808-2102",
+  // tel: links work everywhere on iPhone; strip non-digits for the href
+  phoneTel: "+13128082102",
+  active: "Phones live Wed May 13 · Landlines only — no texts",
+}
 
 type BoothTab = "setup" | "rules"
 
@@ -47,10 +60,38 @@ export function BoothPage() {
       </div>
 
       {/* Location Info */}
-      <div className="rounded-xl p-3 mb-4 text-[13px]"
+      <div className="rounded-xl p-3 mb-3 text-[13px]"
         style={{ background: "var(--accent-light)", color: "var(--accent)" }}>
         <MapPin size={14} className="inline mr-1.5" />
         <strong>North Building</strong> &middot; Booths 5500-9200 &middot; Max height 8&apos;3&quot;
+      </div>
+
+      {/* Floor manager — first call when something goes wrong on-floor.
+          Tappable phone link (works on iOS/Android — opens dialer). */}
+      <div className="rounded-xl p-3.5 mb-4"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+        <div className="text-[10px] font-bold tracking-widest uppercase mb-1.5" style={{ color: "var(--text-muted)" }}>
+          Floor Manager
+        </div>
+        <div className="flex items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="text-[15px] font-bold" style={{ color: "var(--text)" }}>{FLOOR_MANAGER.name}</div>
+            <div className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{FLOOR_MANAGER.zone}</div>
+            <div className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+              <MapPin size={11} className="inline mr-1 -mt-0.5" />
+              {FLOOR_MANAGER.desk}
+            </div>
+          </div>
+          <a href={`tel:${FLOOR_MANAGER.phoneTel}`}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-bold no-underline active:scale-[0.97] transition-all flex-shrink-0"
+            style={{ background: "var(--accent)", color: "var(--accent-fg)" }}>
+            <Phone size={13} />
+            {FLOOR_MANAGER.phone}
+          </a>
+        </div>
+        <div className="text-[10px] mt-2 leading-snug" style={{ color: "var(--amber)" }}>
+          ⚠ {FLOOR_MANAGER.active}
+        </div>
       </div>
 
       {/* Tabs */}
