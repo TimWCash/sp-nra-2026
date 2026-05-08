@@ -409,7 +409,7 @@ export const team: TeamMember[] = [
     initials: "R",
     photo: "/team/rebecca.jpg",
     flights: [
-      { label: "✈️ DFW → ORD", detail: "May 15 · 7:00am · AA1120 · Arrives 9:27am" },
+      { label: "✈️ DFW → ORD", detail: "May 16 (Sat) · time TBD" },
       { label: "✈️ ORD → DFW", detail: "May 20 · 8:15am · AA481 · Arrives 10:53am" },
     ],
     accommodation: "🏨 Hilton Garden Inn Chicago Downtown/Magnificent Mile",
