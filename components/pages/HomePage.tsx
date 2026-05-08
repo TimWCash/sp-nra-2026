@@ -9,10 +9,26 @@ import { supabase } from "@/lib/supabase"
 
 import type { PageId } from "@/components/layout/BottomNav"
 
-const FLIGHTS_KEY = "sp_flight_overrides"
-const ACCOMMODATION_KEY = "sp_accommodation_overrides"
-
 interface FlightEntry { label: string; detail: string }
+
+// Shape of a row in the Supabase `team_travel` table — mirrors what the
+// Team page writes when a teammate edits their flights/hotel.
+interface TeamTravelRow {
+  name: string
+  flights: FlightEntry[] | null
+  accommodation: string | null
+}
+
+function normalizeFlights(raw: unknown): FlightEntry[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((f): f is { label?: unknown; detail?: unknown } => !!f && typeof f === "object")
+    .map((f) => ({
+      label: typeof f.label === "string" ? f.label : "",
+      detail: typeof f.detail === "string" ? f.detail : "",
+    }))
+    .filter((f) => f.label.trim() !== "")
+}
 
 interface PodcastBooking {
   id: string
@@ -37,11 +53,6 @@ function formatPodcastTime(t: string) {
   return m === 0 ? `${h}${ampm}` : `${h}:${String(m).padStart(2, "0")}${ampm}`
 }
 
-function readLocal<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback
-  try { return JSON.parse(localStorage.getItem(key) || "null") ?? fallback } catch { return fallback }
-}
-
 const BAT_SIGNAL_KEY = "sp_bat_signal"
 
 interface HomePageProps {
@@ -62,11 +73,42 @@ export function HomePage({ onNavigate }: HomePageProps) {
   const [guestsTotal, setGuestsTotal] = useState(0)
 
   useEffect(() => {
-    setFlightOverrides(readLocal(FLIGHTS_KEY, {}))
-    setAccommodationOverrides(readLocal(ACCOMMODATION_KEY, {}))
     if (typeof window !== "undefined") {
       setBookUrl(`${window.location.origin}/book`)
     }
+  }, [])
+
+  // Travel + hotel overrides come from the Supabase `team_travel` table
+  // (single source of truth — Team page writes there). Subscribe to realtime
+  // updates so an edit on the Team page propagates instantly to this dropdown
+  // without needing to reload.
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      const { data, error } = await supabase
+        .from("team_travel")
+        .select("name, flights, accommodation")
+      if (cancelled || error || !data) return
+      const rows = data as TeamTravelRow[]
+      const nextFlights: Record<string, FlightEntry[]> = {}
+      const nextAccommodation: Record<string, string> = {}
+      for (const r of rows) {
+        nextFlights[r.name] = normalizeFlights(r.flights)
+        // Use `in` semantics in the renderer; if accommodation is null in DB
+        // we still record an empty string so it overrides the default.
+        nextAccommodation[r.name] = r.accommodation ?? ""
+      }
+      setFlightOverrides(nextFlights)
+      setAccommodationOverrides(nextAccommodation)
+    }
+
+    load()
+    const channel = supabase
+      .channel("home_team_travel_changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "team_travel" }, load)
+      .subscribe()
+    return () => { cancelled = true; channel.unsubscribe() }
   }, [])
 
   useEffect(() => {
