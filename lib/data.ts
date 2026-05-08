@@ -401,7 +401,7 @@ export const team: TeamMember[] = [
       { label: "✈️ SYR → ORD", detail: "May 15 · 10:36am · UA5964 Seat 7B" },
       { label: "✈️ ORD → SYR", detail: "May 20 · 10:35am" },
     ],
-    accommodation: "🏠 Airbnb — Pilsen Home",
+    accommodation: "🏠 Airbnb",
     linkedin: "https://www.linkedin.com/in/reece-brian/",
   },
   {
@@ -428,7 +428,7 @@ export const team: TeamMember[] = [
     name: "Steve",
     initials: "S",
     photo: "/team/steve.jpg",
-    accommodation: "🏠 Airbnb — Pilsen Home",
+    accommodation: "🏠 Airbnb",
     notes: ["🚗 Driving to Chicago"],
     linkedin: "https://www.linkedin.com/in/steve-crowley-445b507/",
   },
