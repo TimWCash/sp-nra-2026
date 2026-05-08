@@ -223,20 +223,26 @@ export function MorePage({ onNavigate }: MorePageProps) {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-bold" style={{ color: "var(--text)" }}>Show To Go</div>
-            <div className="text-[12px] mt-0.5 leading-snug" style={{ color: "var(--text-muted)" }}>
+            <div className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+              Listed as &ldquo;National Restaurant Show&rdquo; in the stores.
+            </div>
+            <div className="text-[12px] mt-1.5 leading-snug" style={{ color: "var(--text-muted)" }}>
               NRA&apos;s official app. Floor map, full exhibitor list, session search.
               Worth installing alongside this one.
             </div>
           </div>
         </div>
         <div className="flex gap-2">
-          <a href="https://apps.apple.com/search?term=NRA+Show+To+Go"
+          {/* Listed in stores as "National Restaurant Show" (not "Show To Go" —
+              that's NRA's branding for the platform). Direct links to the
+              actual store pages. */}
+          <a href="https://apps.apple.com/us/app/national-restaurant-show/id1492482397"
             target="_blank" rel="noopener noreferrer"
             className="flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-[12px] font-bold no-underline active:scale-[0.97] transition-all"
             style={{ background: "var(--text)", color: "var(--surface)" }}>
             <ExternalLink size={12} /> App Store
           </a>
-          <a href="https://play.google.com/store/search?q=NRA+Show+To+Go&c=apps"
+          <a href="https://play.google.com/store/apps/details?id=com.mapyourshow.RESTAURANT20MobileApp"
             target="_blank" rel="noopener noreferrer"
             className="flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-[12px] font-bold no-underline active:scale-[0.97] transition-all"
             style={{ background: "var(--text)", color: "var(--surface)" }}>
