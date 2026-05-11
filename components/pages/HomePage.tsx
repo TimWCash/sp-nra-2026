@@ -71,10 +71,27 @@ export function HomePage({ onNavigate }: HomePageProps) {
   const [bookUrl, setBookUrl] = useState("https://sp-nra-2026.vercel.app/book")
   const [upcomingGuests, setUpcomingGuests] = useState<PodcastBooking[]>([])
   const [guestsTotal, setGuestsTotal] = useState(0)
+  // True if this device hasn't identified its owner yet. We show a banner
+  // that nags them to do it — without a name the Bat Signal team registry
+  // can't tell who's missing setup.
+  const [needsIdentity, setNeedsIdentity] = useState(false)
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       setBookUrl(`${window.location.origin}/book`)
+    }
+    // Identity-check: re-evaluate on focus so the banner disappears the moment
+    // they pick a name on Setup and come back.
+    const check = () => {
+      if (typeof window === "undefined") return
+      setNeedsIdentity(!localStorage.getItem("sp_user_name"))
+    }
+    check()
+    window.addEventListener("focus", check)
+    window.addEventListener("visibilitychange", check)
+    return () => {
+      window.removeEventListener("focus", check)
+      window.removeEventListener("visibilitychange", check)
     }
   }, [])
 
@@ -199,6 +216,34 @@ export function HomePage({ onNavigate }: HomePageProps) {
 
   return (
     <div className="animate-fade-in">
+
+      {/* "Pick your name" prompt — only shows for teammates who haven't
+          identified themselves yet. Without a name on their push
+          subscription, they don't show up in the team registry on
+          TeamStatus, so we nag them gently until they do it. */}
+      {needsIdentity && (
+        <button
+          onClick={() => onNavigate?.("setup")}
+          className="w-full rounded-2xl p-4 mb-4 flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-all duration-200 border-0 text-left"
+          style={{
+            background: "var(--accent-light)",
+            border: "1px solid var(--accent)",
+          }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: "var(--accent)", color: "var(--accent-fg)" }}>
+            <UserPlus size={18} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-[14px]" style={{ color: "var(--accent)" }}>
+              Pick your name (5 seconds)
+            </div>
+            <div className="text-[12px] mt-0.5" style={{ color: "var(--accent)", opacity: 0.85 }}>
+              So the team can see you on the registry and Bat Signal knows who you are.
+            </div>
+          </div>
+          <ArrowRight size={16} style={{ color: "var(--accent)" }} />
+        </button>
+      )}
 
       {/* Bat Signal Banner */}
       {batActive && (
