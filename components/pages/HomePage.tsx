@@ -75,16 +75,47 @@ export function HomePage({ onNavigate }: HomePageProps) {
   // that nags them to do it — without a name the Bat Signal team registry
   // can't tell who's missing setup.
   const [needsIdentity, setNeedsIdentity] = useState(false)
+  // True if this device has a push subscription that's signed against a
+  // STALE VAPID public key (server has since rotated). Until the drift
+  // heal fires, this phone won't receive Bat Signals. The banner is the
+  // visible nudge to open Setup and re-arm.
+  const [needsRearm, setNeedsRearm] = useState(false)
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       setBookUrl(`${window.location.origin}/book`)
     }
-    // Identity-check: re-evaluate on focus so the banner disappears the moment
-    // they pick a name on Setup and come back.
-    const check = () => {
+    // Identity + Bat-Signal-rearm checks. Both re-evaluate on focus so the
+    // banners disappear the moment the user fixes them on Setup and bounces
+    // back to Home.
+    const currentVapid = (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "").trim()
+    const check = async () => {
       if (typeof window === "undefined") return
       setNeedsIdentity(!localStorage.getItem("sp_user_name"))
+
+      // Rearm check — only meaningful if notifications are granted AND a
+      // subscription exists in the browser. If they've never set up, the
+      // identity banner is what they need (not this one).
+      try {
+        if (
+          !("Notification" in window) ||
+          Notification.permission !== "granted" ||
+          !("serviceWorker" in navigator) ||
+          !currentVapid
+        ) {
+          setNeedsRearm(false)
+          return
+        }
+        const reg = await navigator.serviceWorker.ready
+        const sub = await reg.pushManager.getSubscription()
+        if (!sub) { setNeedsRearm(false); return }
+        const stamped = localStorage.getItem("sp_vapid_public_key")
+        // If stamped is missing (legacy sub from before the stamp existed) OR
+        // it doesn't match the current key, we need a refresh.
+        setNeedsRearm(!stamped || stamped !== currentVapid)
+      } catch {
+        setNeedsRearm(false)
+      }
     }
     check()
     window.addEventListener("focus", check)
@@ -216,6 +247,37 @@ export function HomePage({ onNavigate }: HomePageProps) {
 
   return (
     <div className="animate-fade-in">
+
+      {/* Re-arm prompt — shows for teammates whose push subscription was
+          signed against an old VAPID public key (e.g. after we rotated
+          keys on 2026-05-12). Until they open Setup and let the drift
+          detector run, they won't receive Bat Signals. Amber rather than
+          accent so it reads "action required" vs the friendlier teal
+          identity nudge below. Hidden if identity isn't set — the identity
+          flow handles it. */}
+      {needsRearm && !needsIdentity && (
+        <button
+          onClick={() => onNavigate?.("setup")}
+          className="w-full rounded-2xl p-4 mb-4 flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-all duration-200 border-0 text-left"
+          style={{
+            background: "var(--amber-light)",
+            border: "1px solid var(--amber)",
+          }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: "var(--amber)", color: "#fff" }}>
+            <Zap size={18} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-[14px]" style={{ color: "var(--amber)" }}>
+              Re-arm Bat Signal (10 seconds)
+            </div>
+            <div className="text-[12px] mt-0.5" style={{ color: "var(--amber)", opacity: 0.9 }}>
+              Your push subscription needs a refresh. Tap to fix — no setup re-run needed.
+            </div>
+          </div>
+          <ArrowRight size={16} style={{ color: "var(--amber)" }} />
+        </button>
+      )}
 
       {/* "Pick your name" prompt — only shows for teammates who haven't
           identified themselves yet. Without a name on their push
