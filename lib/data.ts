@@ -391,6 +391,13 @@ export const team: TeamMember[] = [
     initials: "El",
     photo: "/team/ellis.jpg",
   },
+  // Test slot — pick this on Setup to register a fresh push subscription
+  // without disturbing the 7 real teammates' subs. Used during pre-show
+  // diagnostics for the Bat Signal. Safe to remove after the show.
+  {
+    name: "Test",
+    initials: "T",
+  },
 ]
 
 // ── BOOTH ITEMS & COSTS ──
