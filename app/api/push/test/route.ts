@@ -14,9 +14,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing endpoint" }, { status: 400 })
   }
 
-  const vapidPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-  const vapidPrivate = process.env.VAPID_PRIVATE_KEY
-  const vapidMailto = process.env.VAPID_MAILTO || "mailto:tim@servicephysics.com"
+  // .trim() — see app/api/bat-signal/route.ts for why.
+  const vapidPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim()
+  const vapidPrivate = process.env.VAPID_PRIVATE_KEY?.trim()
+  const vapidMailto = process.env.VAPID_MAILTO?.trim() || "mailto:tim@servicephysics.com"
 
   if (!vapidPublic || !vapidPrivate) {
     return NextResponse.json(

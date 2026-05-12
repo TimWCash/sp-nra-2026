@@ -7,7 +7,9 @@ import {
 } from "lucide-react"
 import { team as teamData } from "@/lib/data"
 
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""
+// Trim — env values pasted into Vercel can carry trailing newlines that
+// break base64url validation. Server-side routes do the same defensive trim.
+const VAPID_PUBLIC_KEY = (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "").trim()
 
 // Same key SessionNotes uses, so identifying yourself anywhere identifies
 // you everywhere.

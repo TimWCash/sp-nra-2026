@@ -32,9 +32,13 @@ export async function POST(req: Request) {
   // Validate VAPID config BEFORE we mutate state. If we can't actually fire
   // pushes, we don't want the dashboard to flip to "active" — that gives
   // the team false confidence.
-  const vapidPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-  const vapidPrivate = process.env.VAPID_PRIVATE_KEY
-  const vapidMailto = process.env.VAPID_MAILTO || "mailto:tim@servicephysics.com"
+  // .trim() defense — a pasted value in Vercel's env editor can carry a
+  // trailing newline, and web-push rejects with "Vapid public key must be
+  // URL safe Base64" because \n isn't in the base64url charset. Found this
+  // the hard way; trim everywhere we read VAPID env.
+  const vapidPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim()
+  const vapidPrivate = process.env.VAPID_PRIVATE_KEY?.trim()
+  const vapidMailto = process.env.VAPID_MAILTO?.trim() || "mailto:tim@servicephysics.com"
   if (wantActive && (!vapidPublic || !vapidPrivate)) {
     return NextResponse.json(
       {
