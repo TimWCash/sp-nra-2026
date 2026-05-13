@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "comment": "Nightly auto-backup. 04:00 UTC = 23:00 (11pm) Central Daylight Time during NRA. Captures everything from the day that just ended.",
+      "path": "/api/cron/backup",
+      "schedule": "0 4 * * *"
+    }
+  ]
+}
