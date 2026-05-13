@@ -36,13 +36,27 @@ const TABLES = [
 // Allow GET so Vercel cron's GET request works AND so curl-from-laptop is easy.
 export async function GET(req: NextRequest) {
   // ── Auth ──
-  const expected = process.env.CRON_SECRET
+  // .trim() both values — same defensive guard as VAPID env. A trailing
+  // newline pasted into Vercel's env editor silently breaks comparison
+  // and gives a confusing 401.
+  const expected = (process.env.CRON_SECRET || "").trim()
   if (!expected) {
     return NextResponse.json({ ok: false, error: "CRON_SECRET not set" }, { status: 500 })
   }
-  const auth = req.headers.get("authorization") || ""
-  if (auth !== `Bearer ${expected}`) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 })
+  const authHeader = (req.headers.get("authorization") || "").trim()
+  const presented = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : ""
+  if (presented !== expected) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Unauthorized",
+        // Length hints help diagnose paste-whitespace issues without
+        // leaking secrets.
+        expected_length: expected.length,
+        presented_length: presented.length,
+      },
+      { status: 401 },
+    )
   }
 
   // ── Env validation ──
