@@ -20,9 +20,10 @@ interface TeamMemberStatus {
 }
 
 const STORAGE_KEY = "sp_team_status"
-const LEADS_KEY = "sp_nra_leads"
 const BAT_SIGNAL_KEY = "sp_bat_signal"
-const DAILY_GOAL = 20
+// Overall qualified-leads goal across the whole show. "Qualified" = heat is
+// hot or warm (cool leads = met-but-not-relevant, excluded from the metric).
+const QUALIFIED_GOAL = 50
 
 const statusConfig: Record<MemberStatus, { label: string; color: string; bg: string }> = {
   "at-booth": { label: "At Booth", color: "var(--success)", bg: "var(--success-light)" },
@@ -56,12 +57,30 @@ function saveTeam(team: TeamMemberStatus[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(team))
 }
 
-function getLeadCount(): number {
-  if (typeof window === "undefined") return 0
+/**
+ * Live qualified-lead counter from Supabase. "Qualified" = hot or warm heat
+ * (cool leads are met-but-not-relevant and don't count toward the goal).
+ *
+ * Returns { qualified, hot, warm, total } so the UI can show the breakdown.
+ */
+type LeadCounts = { qualified: number; hot: number; warm: number; total: number }
+
+async function fetchLeadCounts(): Promise<LeadCounts> {
   try {
-    const leads = JSON.parse(localStorage.getItem(LEADS_KEY) || "[]")
-    return Array.isArray(leads) ? leads.length : 0
-  } catch { return 0 }
+    const { data, error } = await supabase
+      .from("nra_leads")
+      .select("heat")
+    if (error || !data) return { qualified: 0, hot: 0, warm: 0, total: 0 }
+    let hot = 0
+    let warm = 0
+    for (const row of data as Array<{ heat: string }>) {
+      if (row.heat === "hot") hot++
+      else if (row.heat === "warm") warm++
+    }
+    return { qualified: hot + warm, hot, warm, total: data.length }
+  } catch {
+    return { qualified: 0, hot: 0, warm: 0, total: 0 }
+  }
 }
 
 async function fetchBatSignal(): Promise<{ active: boolean; since: number }> {
@@ -130,7 +149,7 @@ async function postBatSignal(active: boolean): Promise<BatSignalSendResult> {
 
 export function TeamStatusPage() {
   const [team, setTeam] = useState<TeamMemberStatus[]>(defaultTeam)
-  const [leadCount, setLeadCount] = useState(0)
+  const [leadCounts, setLeadCounts] = useState<LeadCounts>({ qualified: 0, hot: 0, warm: 0, total: 0 })
   const [batSignal, setBatSignalState] = useState<{ active: boolean; since: number }>({ active: false, since: 0 })
   const [pulse, setPulse] = useState(false)
   const [shiftFilter, setShiftFilter] = useState<ShiftFilter>("all")
@@ -152,13 +171,24 @@ export function TeamStatusPage() {
     window.addEventListener("focus", read)
     return () => window.removeEventListener("focus", read)
   }, [])
+
+  // Realtime qualified-lead counter — any teammate's lead save / heat
+  // change / delete updates this card instantly across every device.
+  useEffect(() => {
+    const channel = supabase
+      .channel("nra_leads_qualified_counts")
+      .on("postgres_changes", { event: "*", schema: "public", table: "nra_leads" },
+        () => { fetchLeadCounts().then(setLeadCounts) })
+      .subscribe()
+    return () => { channel.unsubscribe() }
+  }, [])
   // Track the previous signal state so we only vibrate on a false→true transition,
   // not on every render or on the initial mount if the signal was already active.
   const prevBatActiveRef = useRef<boolean | null>(null)
 
   useEffect(() => {
     setTeam(loadTeam())
-    setLeadCount(getLeadCount())
+    fetchLeadCounts().then(setLeadCounts)
     fetchBatSignal().then(setBatSignalState)
     fetchPushStatus().then(({ count, registeredNames }) => {
       setSubCount(count)
@@ -169,7 +199,7 @@ export function TeamStatusPage() {
   useEffect(() => {
     const interval = setInterval(() => {
       fetchBatSignal().then(setBatSignalState)
-      setLeadCount(getLeadCount())
+      fetchLeadCounts().then(setLeadCounts)
       fetchPushStatus().then(({ count, registeredNames }) => {
         setSubCount(count)
         setRegisteredNames(registeredNames)
@@ -258,7 +288,7 @@ export function TeamStatusPage() {
   if (counts["walking"]) summaryParts.push(`${counts["walking"]} walking`)
   if (counts["in-meeting"]) summaryParts.push(`${counts["in-meeting"]} in meeting`)
 
-  const progressPct = Math.min(100, Math.round((leadCount / DAILY_GOAL) * 100))
+  const progressPct = Math.min(100, Math.round((leadCounts.qualified / QUALIFIED_GOAL) * 100))
 
   const filteredTeam = team.filter((m) => {
     if (shiftFilter === "all") return true
@@ -616,15 +646,17 @@ export function TeamStatusPage() {
         ))}
       </div>
 
-      {/* Lead goal progress */}
-      <SectionLabel>Daily Lead Goal</SectionLabel>
-      <div className="rounded-xl p-4 mb-6"
+      {/* Qualified leads — overall show goal. "Qualified" = hot OR warm
+          heat (cool excluded). Updates in realtime via Supabase channel
+          on nra_leads, so any teammate's lead save shows here instantly. */}
+      <SectionLabel>Qualified Leads</SectionLabel>
+      <div className="rounded-xl p-4 mb-2"
         style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Target size={16} style={{ color: "var(--accent)" }} />
             <span className="text-sm font-semibold" style={{ color: "var(--text)" }}>
-              {leadCount} / {DAILY_GOAL} leads
+              {leadCounts.qualified} / {QUALIFIED_GOAL} qualified
             </span>
           </div>
           <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
@@ -635,13 +667,30 @@ export function TeamStatusPage() {
             {progressPct}%
           </span>
         </div>
-        <div className="w-full h-2.5 rounded-full overflow-hidden" style={{ background: "var(--surface-alt)" }}>
+        <div className="w-full h-2.5 rounded-full overflow-hidden mb-2" style={{ background: "var(--surface-alt)" }}>
           <div className="h-full rounded-full transition-all duration-500"
             style={{
               width: `${progressPct}%`,
               background: progressPct >= 100 ? "var(--success)" : "var(--accent)",
             }} />
         </div>
+        {/* Heat breakdown — hot + warm = qualified; cool excluded */}
+        <div className="flex items-center gap-3 text-[11px]" style={{ color: "var(--text-muted)" }}>
+          <span className="font-bold" style={{ color: "var(--danger)" }}>🔥 {leadCounts.hot} hot</span>
+          <span>·</span>
+          <span className="font-bold" style={{ color: "var(--amber)" }}>☀️ {leadCounts.warm} warm</span>
+          {leadCounts.total > leadCounts.qualified && (
+            <>
+              <span>·</span>
+              <span>{leadCounts.total - leadCounts.qualified} cool (not counted)</span>
+            </>
+          )}
+        </div>
+      </div>
+      <div className="text-[11px] mb-6 leading-relaxed" style={{ color: "var(--text-muted)" }}>
+        <b>Qualified = hot or warm.</b> Hot = decision-maker, asked for follow-up.
+        Warm = relevant company, engaged conversation. Cool leads (met but not a fit)
+        don&apos;t count toward the goal.
       </div>
 
       {/* Leaderboard placeholder */}

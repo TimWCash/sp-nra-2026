@@ -29,6 +29,13 @@ export type ChangelogEntry = {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-05-13-qualified-leads",
+    emoji: "🎯",
+    title: "New: Qualified Leads counter (replaces daily count)",
+    body: "On Team Status — tracks hot + warm leads toward our 50-qualified show goal. Cool leads (met but not a fit) are recorded but don't count toward the metric.",
+    cta: { label: "See it", page: "status" },
+  },
+  {
     id: "2026-05-13-backup",
     emoji: "💾",
     title: "Download all our data as a backup",
