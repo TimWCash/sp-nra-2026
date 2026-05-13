@@ -92,15 +92,39 @@ async function fetchPushStatus(): Promise<{ count: number; registeredNames: stri
   }
 }
 
-async function postBatSignal(active: boolean): Promise<void> {
+/**
+ * Server response from /api/bat-signal POST. The route always returns these
+ * fields (alongside `active`, `since`, and an optional `error`/`warning`).
+ */
+export type BatSignalSendResult = {
+  ok: boolean
+  pushed: number
+  failed: number
+  total: number
+  error?: string
+  warning?: string
+}
+
+async function postBatSignal(active: boolean): Promise<BatSignalSendResult> {
   try {
-    await fetch("/api/bat-signal", {
+    const res = await fetch("/api/bat-signal", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ active }),
     })
-  } catch { /* ignore */ }
-  localStorage.setItem(BAT_SIGNAL_KEY, JSON.stringify({ active, since: active ? Date.now() : 0 }))
+    const json: Partial<BatSignalSendResult> = await res.json().catch(() => ({}))
+    localStorage.setItem(BAT_SIGNAL_KEY, JSON.stringify({ active, since: active ? Date.now() : 0 }))
+    return {
+      ok: res.ok,
+      pushed: typeof json.pushed === "number" ? json.pushed : 0,
+      failed: typeof json.failed === "number" ? json.failed : 0,
+      total: typeof json.total === "number" ? json.total : 0,
+      error: typeof json.error === "string" ? json.error : undefined,
+      warning: typeof json.warning === "string" ? json.warning : undefined,
+    }
+  } catch {
+    return { ok: false, pushed: 0, failed: 0, total: 0, error: "Network error — server unreachable." }
+  }
 }
 
 export function TeamStatusPage() {
@@ -112,6 +136,11 @@ export function TeamStatusPage() {
   const [subCount, setSubCount] = useState<number | null>(null)
   const [registeredNames, setRegisteredNames] = useState<string[]>([])
   const [showRegistry, setShowRegistry] = useState(false)
+  // Last bat-signal send result — surfaced as a status card so Tim/whoever
+  // tapped can SEE pushed/failed/total instead of guessing. Cleared after
+  // 12 seconds so the card doesn't linger forever.
+  const [lastSendResult, setLastSendResult] = useState<BatSignalSendResult | null>(null)
+  const [sending, setSending] = useState(false)
   // Track the previous signal state so we only vibrate on a false→true transition,
   // not on every render or on the initial mount if the signal was already active.
   const prevBatActiveRef = useRef<boolean | null>(null)
@@ -178,14 +207,27 @@ export function TeamStatusPage() {
   }
 
   const activateBatSignal = useCallback(async () => {
+    if (sending) return
+    setSending(true)
+    setLastSendResult(null)
     const now = Date.now()
     setBatSignalState({ active: true, since: now })
     // Short haptic confirmation on the sender's own device.
     if (typeof navigator !== "undefined" && "vibrate" in navigator) {
       navigator.vibrate([150, 80, 150])
     }
-    await postBatSignal(true)
-  }, [])
+    const result = await postBatSignal(true)
+    setLastSendResult(result)
+    setSending(false)
+    // If the server rejected (e.g. 0 received → 502), roll back the
+    // optimistic active state. We don't want a phantom red banner when
+    // nobody actually got pushed.
+    if (!result.ok) {
+      setBatSignalState({ active: false, since: 0 })
+    }
+    // Auto-clear the status card after 12s so it doesn't linger.
+    setTimeout(() => setLastSendResult(null), 12_000)
+  }, [sending])
 
   const clearBatSignal = useCallback(async () => {
     setBatSignalState({ active: false, since: 0 })
@@ -254,17 +296,67 @@ export function TeamStatusPage() {
       {!batSignal.active && (
         <button
           onClick={activateBatSignal}
-          className="w-full rounded-2xl p-5 mb-3 flex flex-col items-center gap-2 cursor-pointer active:scale-[0.97] transition-all duration-150 border-0"
+          disabled={sending}
+          className="w-full rounded-2xl p-5 mb-3 flex flex-col items-center gap-2 cursor-pointer active:scale-[0.97] transition-all duration-150 border-0 disabled:opacity-70 disabled:cursor-wait"
           style={{
             background: "linear-gradient(135deg, #1a1a2e, #16213e)",
             boxShadow: "0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)",
           }}
         >
           <span className="text-5xl" style={{ filter: "drop-shadow(0 0 12px rgba(255,200,0,0.8))" }}>🦇</span>
-          <div className="text-white font-extrabold text-[17px] tracking-wide">BAT SIGNAL</div>
-          <div className="text-white/50 text-[12px]">Booth is slammed — call all hands</div>
+          <div className="text-white font-extrabold text-[17px] tracking-wide">
+            {sending ? "SENDING…" : "BAT SIGNAL"}
+          </div>
+          <div className="text-white/50 text-[12px]">
+            {sending ? "Firing push to every registered phone" : "Booth is slammed — call all hands"}
+          </div>
         </button>
       )}
+
+      {/* ── DELIVERY RESULT — shows what just happened after a send.
+          Auto-clears after 12s. Three visual states:
+          - green: everyone got it
+          - amber: partial delivery (some failed)
+          - red: nobody got it OR server-side error
+          This is what fixes "I can't tell if the signal actually went out." */}
+      {lastSendResult && (() => {
+        const r = lastSendResult
+        const allGood = r.ok && r.pushed > 0 && r.failed === 0
+        const partial = r.ok && r.pushed > 0 && r.failed > 0
+        const tone = allGood ? "success" : partial ? "amber" : "danger"
+        const bg = tone === "success" ? "var(--success-light)"
+          : tone === "amber" ? "var(--amber-light)"
+          : "var(--danger-light)"
+        const fg = tone === "success" ? "var(--success)"
+          : tone === "amber" ? "var(--amber)"
+          : "var(--danger)"
+        const headline = allGood
+          ? `✅ Sent — ${r.pushed} of ${r.total} phones buzzed`
+          : partial
+            ? `⚠ Sent — ${r.pushed} of ${r.total} buzzed, ${r.failed} missed`
+            : r.total === 0
+              ? `❌ Nobody received it — 0 phones are registered`
+              : `❌ Nobody received it — ${r.failed} of ${r.total} failed`
+        const sub = allGood
+          ? "All hands are pinged."
+          : partial
+            ? "The team can see who's missing on the registry below."
+            : r.error || "Tell missing teammates to open the app and tap the re-arm banner."
+        return (
+          <div className="rounded-xl p-3.5 mb-3 flex items-start gap-2.5"
+            style={{ background: bg, border: `1px solid ${fg}` }}>
+            <div className="flex-1 min-w-0">
+              <div className="font-bold text-[13px]" style={{ color: fg }}>{headline}</div>
+              <div className="text-[11px] mt-0.5 leading-snug" style={{ color: fg, opacity: 0.85 }}>{sub}</div>
+            </div>
+            <button onClick={() => setLastSendResult(null)}
+              className="text-[11px] font-bold px-2 py-0.5 cursor-pointer bg-transparent border-0"
+              style={{ color: fg }}>
+              ×
+            </button>
+          </div>
+        )
+      })()}
 
       {/* ── DEVICES REGISTERED CHIP — tap to expand the per-name registry ── */}
       {!batSignal.active && subCount !== null && (
