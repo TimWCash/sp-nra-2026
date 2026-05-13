@@ -134,6 +134,21 @@ export const afterHoursEvents: AfterHoursEvent[] = [
     type: "happy-hour",
     confirmed: true,
   },
+  {
+    id: "sat-square-cindys",
+    night: "sat",
+    time: "6:30 PM – 9:30 PM",
+    title: "Square Happy Hour at Cindy's Rooftop",
+    host: "Square",
+    venue: "Cindy's Rooftop",
+    address: "12 S Michigan Ave, Chicago (~3mi from McCormick — rideshare)",
+    cost: "Free (RSVP required — curated/approved)",
+    access: "rsvp",
+    link: "https://squareatnra.my.canva.site/",
+    notes: "\"Elevated rooftop experience designed for real conversations — not badge scans.\" Curated group of operators + industry leaders; access by request only. Overlaps with TipHaus 6:30–7pm if you do both. Cindy's is up in the Loop, not walkable — Uber from McCormick is ~15 min.",
+    type: "happy-hour",
+    confirmed: true,
+  },
   // ── SUNDAY MAY 17 ──
   {
     id: "sun-yp-party",
@@ -194,6 +209,21 @@ export const afterHoursEvents: AfterHoursEvent[] = [
   },
 
   // ── MONDAY MAY 18 ──
+  {
+    id: "mon-square-breakfast",
+    night: "mon",
+    time: "8:30 AM – 11:00 AM",
+    title: "Breakfast with a Vu (Square)",
+    host: "Square",
+    venue: "VU Rooftop",
+    address: "133 E Cermak Rd, Chicago (~0.5mi from McCormick)",
+    cost: "Free (RSVP required — curated/approved)",
+    access: "rsvp",
+    link: "https://squareatnra.my.canva.site/",
+    notes: "Recovery morning before the final push — IV drips, massages, candid conversations with operator peers. Same rooftop as Mon's Harri + ADP evening event and Sun's Maple HH. Worth attending if you were out Sunday night. Runs into show open at 9:30 — leave by ~10:30 to make booth.",
+    type: "happy-hour",
+    confirmed: true,
+  },
   {
     id: "mon-harri-adp",
     night: "mon",
