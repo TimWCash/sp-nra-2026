@@ -29,6 +29,13 @@ export type ChangelogEntry = {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-05-13-backup",
+    emoji: "💾",
+    title: "Download all our data as a backup",
+    body: "On the More page — one tap, get a JSON file with every lead (incl. badge photos), session note, and show photo. Re-runnable anytime. Worth doing right after the show.",
+    cta: { label: "Open backup", page: "more" },
+  },
+  {
     id: "2026-05-12-booth-shifts",
     emoji: "🪑",
     title: "Booth shift schedule",

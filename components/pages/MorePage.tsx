@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Copy, Mail, Users, MessageCircle, Activity, Truck, ChevronRight, HelpCircle, ChevronDown, StickyNote, Camera, PackageOpen, PackageCheck, Smartphone, ExternalLink } from "lucide-react"
+import { Copy, Mail, Users, MessageCircle, Activity, Truck, ChevronRight, HelpCircle, ChevronDown, StickyNote, Camera, PackageOpen, PackageCheck, Smartphone, ExternalLink, Download, Loader2 } from "lucide-react"
 import { keyDates, emailTemplate } from "@/lib/data"
 import { supabase } from "@/lib/supabase"
 import type { PageId } from "@/components/layout/BottomNav"
@@ -86,6 +86,10 @@ export function MorePage({ onNavigate }: MorePageProps) {
   const [notesBy, setNotesBy] = useState("")
   const [notesSaving, setNotesSaving] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Backup state — set while a download is in-progress.
+  const [backupStatus, setBackupStatus] = useState<"idle" | "fetching" | "done" | "error">("idle")
+  const [backupError, setBackupError] = useState<string | null>(null)
+  const [backupStats, setBackupStats] = useState<string>("")
 
   useEffect(() => {
     const saved = localStorage.getItem("sp_nra_captured_by")
@@ -119,6 +123,62 @@ export function MorePage({ onNavigate }: MorePageProps) {
       setCopyLabel("Copied!")
       setTimeout(() => setCopyLabel("Copy to clipboard"), 2000)
     })
+  }
+
+  /**
+   * Pull EVERYTHING out of Supabase (leads with badge photos, session notes,
+   * show photos, team_travel, podcast_bookings, bat-signal state, event
+   * RSVPs, booth shifts) and save it as a single timestamped JSON file the
+   * user downloads to their device.
+   *
+   * Intent: post-show portable backup. Re-runnable any time, no server
+   * route required, no special perms. If Supabase ever disappears, this is
+   * the answer to "where did our leads go."
+   */
+  async function downloadBackup() {
+    setBackupStatus("fetching")
+    setBackupError(null)
+    setBackupStats("")
+    try {
+      const tables = [
+        "nra_leads", "session_notes", "show_photos",
+        "team_travel", "podcast_bookings", "bat_signal_state",
+        "event_rsvps", "booth_shifts",
+      ]
+      const results = await Promise.all(tables.map(async (t) => {
+        const { data, error } = await supabase.from(t).select("*")
+        return { table: t, rows: data ?? [], error: error?.message }
+      }))
+      const errors = results.filter((r) => r.error)
+      const totalRows = results.reduce((sum, r) => sum + r.rows.length, 0)
+      const blob: Record<string, unknown> = {
+        exported_at: new Date().toISOString(),
+        exported_by: localStorage.getItem("sp_user_name") || "(unidentified)",
+        project: "sp-nra-2026",
+        supabase_project_ref: "sgnivfbdsifarpoqctlk",
+        total_rows: totalRows,
+        tables: Object.fromEntries(results.map((r) => [r.table, r.rows])),
+        errors: errors.length > 0 ? errors : undefined,
+      }
+      const json = JSON.stringify(blob, null, 2)
+      const file = new Blob([json], { type: "application/json" })
+      const url = URL.createObjectURL(file)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `sp-nra-2026-backup-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      const leadCount = results.find((r) => r.table === "nra_leads")?.rows.length ?? 0
+      const noteCount = results.find((r) => r.table === "session_notes")?.rows.length ?? 0
+      const photoCount = results.find((r) => r.table === "show_photos")?.rows.length ?? 0
+      const sizeKb = (file.size / 1024).toFixed(0)
+      setBackupStats(`${totalRows} rows · ${sizeKb} KB · ${leadCount} leads · ${noteCount} notes · ${photoCount} photos`)
+      setBackupStatus("done")
+      setTimeout(() => setBackupStatus("idle"), 8000)
+    } catch (err) {
+      setBackupError(err instanceof Error ? err.message : "Unknown error")
+      setBackupStatus("error")
+    }
   }
 
   function handleTileClick(page: PageId, anchor?: string) {
@@ -156,6 +216,41 @@ export function MorePage({ onNavigate }: MorePageProps) {
             <ChevronRight size={16} style={{ color: "var(--text-muted)", opacity: 0.5 }} />
           </button>
         ))}
+      </div>
+
+      {/* ── BACKUP — pull all Supabase data into a single JSON file the
+          user downloads to their device. Re-runnable any time. Includes
+          leads (with badge photos), session notes, show photos, team
+          travel, podcast bookings, etc. The "if Supabase ever evaporates"
+          insurance policy. */}
+      <SectionLabel>Backup All Data</SectionLabel>
+      <div className="rounded-xl p-4 mb-6"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
+        <div className="text-[12px] mb-3" style={{ color: "var(--text-secondary)" }}>
+          Downloads everything in our Supabase project — leads (with badge photos), session notes,
+          show photos, team travel, podcast bookings — as a single JSON file you can save to iCloud
+          / Drive / wherever. Safe to run anytime. Good idea right after the show.
+        </div>
+        <button onClick={downloadBackup}
+          disabled={backupStatus === "fetching"}
+          className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-[13px] font-bold cursor-pointer active:scale-[0.98] transition-all border-0 disabled:opacity-60 disabled:cursor-wait"
+          style={{ background: "var(--accent)", color: "var(--accent-fg)" }}>
+          {backupStatus === "fetching"
+            ? <><Loader2 size={14} className="animate-spin" /> Fetching from Supabase…</>
+            : <><Download size={14} /> Download backup (.json)</>}
+        </button>
+        {backupStatus === "done" && (
+          <div className="text-[11px] mt-2 px-3 py-2 rounded-lg"
+            style={{ background: "var(--success-light)", color: "var(--success)" }}>
+            ✓ Downloaded · {backupStats}
+          </div>
+        )}
+        {backupStatus === "error" && backupError && (
+          <div className="text-[11px] mt-2 px-3 py-2 rounded-lg"
+            style={{ background: "var(--danger-light)", color: "var(--danger)" }}>
+            ✗ {backupError}
+          </div>
+        )}
       </div>
 
       {/* Shared Notes */}
