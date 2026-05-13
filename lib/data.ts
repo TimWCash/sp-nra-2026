@@ -160,7 +160,7 @@ export const afterHoursEvents: AfterHoursEvent[] = [
     cost: "Free (RSVP required)",
     access: "rsvp",
     link: "https://go.harri.com/nra2026",
-    notes: "Rooftop cocktails + networking with restaurant industry leaders. Limited capacity — RSVPs reviewed individually. Ends right as the House of Blues after-party starts.",
+    notes: "Cocktails and connections with leaders from the restaurant industry. Limited capacity — RSVPs reviewed individually. Ends right as the House of Blues after-party starts.",
     type: "happy-hour",
     confirmed: true,
   },
