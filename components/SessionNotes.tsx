@@ -174,21 +174,10 @@ export function SessionNotes({ sessionTitle, sessionDay, sessionCategory, sessio
     if (ok) {
       await dequeueNote(note.id)
       refreshPendingCount()
-      // Fire-and-forget mirror to the team Google Sheet's "Notes" tab.
-      // Supabase is the source of truth; Sheet is just a convenience for the
-      // team to scan notes alongside leads. If this fails (offline, sheet
-      // unreachable), the note is still safe in Supabase + JSON backup.
-      fetch("/api/notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_title: note.session_title,
-          session_day: note.session_day,
-          author: note.author,
-          content: note.content,
-          created_at: note.created_at,
-        }),
-      }).catch(() => { /* best-effort; backup covers durability */ })
+      // (No Sheet mirror — by design. Notes live in Supabase + are
+      // captured by the More-page "Download backup" JSON export. The
+      // /api/notes route exists in case we want to re-enable Sheet sync
+      // later, but currently isn't called.)
     }
     setSaving(false)
   }

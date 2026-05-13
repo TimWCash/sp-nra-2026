@@ -29,12 +29,6 @@ export type ChangelogEntry = {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    id: "2026-05-13-notes-to-sheet",
-    emoji: "📝",
-    title: "Session notes now mirror to the Google Sheet",
-    body: "Whenever you save a note on a scheduled session, it appears on the \"Notes\" tab of the team Sheet alongside the leads. Auto-created the first time someone saves.",
-  },
-  {
     id: "2026-05-13-backup",
     emoji: "💾",
     title: "Download all our data as a backup",
