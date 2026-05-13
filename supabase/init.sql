@@ -100,6 +100,30 @@ create table if not exists public.podcast_bookings (
   unique (day, time)               -- enforces "slot already booked" 23505 path in app
 );
 
+-- ── After-hours event RSVPs ──────────────────────────────────────────────
+-- One row per (event_id, team_member). Lets teammates tap "I'm going" on
+-- after-hours event cards so the team can see who's covering what for
+-- overlapping events on the same night.
+create table if not exists public.event_rsvps (
+  id          uuid primary key default gen_random_uuid(),
+  event_id    text not null,            -- matches AfterHoursEvent.id from lib/data.ts
+  team_member text not null,
+  created_at  timestamptz default now(),
+  unique (event_id, team_member)        -- one RSVP per person per event
+);
+
+-- ── Booth shift sign-ups ─────────────────────────────────────────────────
+-- Each row is "teammate X is covering this shift on this day."
+-- Day = 'sat'|'sun'|'mon'|'tue'. Shift = 'morning'|'afternoon'.
+create table if not exists public.booth_shifts (
+  id          uuid primary key default gen_random_uuid(),
+  day         text not null,
+  shift       text not null,
+  team_member text not null,
+  created_at  timestamptz default now(),
+  unique (day, shift, team_member)
+);
+
 -- ── RLS: this app uses the anon key directly from the browser. With the new
 -- sb_publishable_* keys, RLS is enforced regardless of the table's "disable
 -- RLS" setting, so we leave RLS on and add explicit policies.
@@ -134,28 +158,31 @@ declare
   -- so endpoint URLs aren't leakable to anyone holding the publishable key.
   select_ok_tbls text[] := array[
     'nra_leads','session_notes','team_travel','show_photos',
-    'podcast_bookings','bat_signal_state'
+    'podcast_bookings','bat_signal_state','event_rsvps','booth_shifts'
   ];
   -- Tables where anon DELETE is acceptable (recoverable inconveniences).
   -- nra_leads + push_subscriptions are intentionally NOT here — bulk delete
   -- is the catastrophic failure mode we're guarding against. Both go
   -- through service-role server routes for any destructive op.
   delete_ok_tbls text[] := array[
-    'session_notes','show_photos','podcast_bookings','team_travel'
+    'session_notes','show_photos','podcast_bookings','team_travel',
+    'event_rsvps','booth_shifts'
   ];
   update_ok_tbls text[] := array[
     'nra_leads','team_travel','bat_signal_state','session_notes',
-    'show_photos','podcast_bookings'
+    'show_photos','podcast_bookings','event_rsvps','booth_shifts'
   ];
   -- Tables where anon INSERT is acceptable. push_subscriptions is excluded
   -- because writes go through the service-role pushStore.
   insert_ok_tbls text[] := array[
-    'nra_leads','session_notes','team_travel','show_photos','podcast_bookings'
+    'nra_leads','session_notes','team_travel','show_photos','podcast_bookings',
+    'event_rsvps','booth_shifts'
   ];
 begin
   foreach tbl in array array[
     'nra_leads','session_notes','push_subscriptions',
-    'team_travel','show_photos','podcast_bookings','bat_signal_state'
+    'team_travel','show_photos','podcast_bookings','bat_signal_state',
+    'event_rsvps','booth_shifts'
   ] loop
     execute format('alter table public.%I enable row level security', tbl);
 
@@ -219,7 +246,7 @@ begin
 
   foreach tbl in array array[
     'nra_leads','session_notes','team_travel','show_photos',
-    'podcast_bookings','bat_signal_state'
+    'podcast_bookings','bat_signal_state','event_rsvps','booth_shifts'
   ] loop
     -- (push_subscriptions intentionally NOT in realtime — server-side only)
     begin

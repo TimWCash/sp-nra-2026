@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { Users, Target, CheckCircle } from "lucide-react"
+import { Users, Target, CheckCircle, Sunrise, Sunset } from "lucide-react"
 import { team as teamData } from "@/lib/data"
 import { NotificationPermission } from "@/components/NotificationPermission"
 import { supabase } from "@/lib/supabase"
+import { useBoothShifts, addBoothShift, removeBoothShift, shiftKey, type ShiftDay, type ShiftSlot } from "@/lib/booth-shifts"
 
 type MemberStatus = "at-booth" | "on-break" | "walking" | "in-meeting" | "off"
 type ShiftValue = "day" | "night" | "both" | undefined
@@ -141,6 +142,16 @@ export function TeamStatusPage() {
   // 12 seconds so the card doesn't linger forever.
   const [lastSendResult, setLastSendResult] = useState<BatSignalSendResult | null>(null)
   const [sending, setSending] = useState(false)
+  // Booth shift coverage — realtime map of "day:shift" → names
+  const shiftCoverage = useBoothShifts()
+  // Who am I? Mirrors the pattern used in SchedulePage / SetupPage.
+  const [userName, setUserName] = useState<string>("")
+  useEffect(() => {
+    const read = () => setUserName(localStorage.getItem("sp_user_name") || "")
+    read()
+    window.addEventListener("focus", read)
+    return () => window.removeEventListener("focus", read)
+  }, [])
   // Track the previous signal state so we only vibrate on a false→true transition,
   // not on every render or on the initial mount if the signal was already active.
   const prevBatActiveRef = useRef<boolean | null>(null)
@@ -521,6 +532,88 @@ export function TeamStatusPage() {
 
       <div className="text-[11px] mb-6" style={{ color: "var(--text-muted)" }}>
         Tap card to cycle status · Tap shift badge to assign
+      </div>
+
+      {/* ── BOOTH SHIFT SCHEDULE — 4 days × 2 slots ──────────────────────
+          Lets each teammate sign up for morning (9:30–1pm) or afternoon
+          (1pm–close) coverage on any day. Realtime via Supabase so two
+          phones can sign up simultaneously without stepping on each other.
+          Tap "+ me" to add yourself; tap your own pill to remove. */}
+      <SectionLabel>Booth Shifts</SectionLabel>
+      <div className="text-[11px] mb-2.5 -mt-1" style={{ color: "var(--text-muted)" }}>
+        Sign up for morning (9:30am–1pm) or afternoon (1pm–close) coverage.
+        {!userName && " Pick your name on Setup before signing up."}
+      </div>
+      <div className="rounded-xl overflow-hidden mb-6"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+        {([
+          { day: "sat" as ShiftDay, label: "Sat May 16" },
+          { day: "sun" as ShiftDay, label: "Sun May 17" },
+          { day: "mon" as ShiftDay, label: "Mon May 18" },
+          { day: "tue" as ShiftDay, label: "Tue May 19" },
+        ]).map((d, idx, arr) => (
+          <div key={d.day}
+            className={`px-3 py-3 ${idx < arr.length - 1 ? "border-b" : ""}`}
+            style={{ borderColor: "var(--border)" }}>
+            <div className="text-[11px] font-bold tracking-wider mb-2"
+              style={{ color: "var(--text)" }}>
+              {d.label}
+            </div>
+            <div className="space-y-1.5">
+              {([
+                { slot: "morning" as ShiftSlot, label: "Morning", time: "9:30am–1pm", Icon: Sunrise, tone: "var(--amber)" },
+                { slot: "afternoon" as ShiftSlot, label: "Afternoon", time: "1pm–close", Icon: Sunset, tone: "var(--accent)" },
+              ]).map((s) => {
+                const names = shiftCoverage.get(shiftKey(d.day, s.slot)) || []
+                const userOnShift = !!userName && names.some((n) => n.toLowerCase() === userName.toLowerCase())
+                return (
+                  <div key={s.slot} className="flex items-start gap-2">
+                    <div className="flex-shrink-0 flex items-center gap-1.5 w-[112px]">
+                      <s.Icon size={13} style={{ color: s.tone }} />
+                      <div>
+                        <div className="text-[12px] font-bold leading-none" style={{ color: "var(--text)" }}>{s.label}</div>
+                        <div className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>{s.time}</div>
+                      </div>
+                    </div>
+                    <div className="flex-1 flex items-center gap-1 flex-wrap">
+                      {names.map((n) => {
+                        const isMe = !!userName && n.toLowerCase() === userName.toLowerCase()
+                        return (
+                          <button key={n}
+                            onClick={isMe ? () => removeBoothShift(d.day, s.slot, userName) : undefined}
+                            disabled={!isMe}
+                            title={isMe ? "Tap to drop this shift" : `${n} is covering`}
+                            className="text-[10px] font-bold px-2 py-0.5 rounded-full cursor-default disabled:cursor-default"
+                            style={{
+                              background: isMe ? "var(--success-light)" : "var(--accent-light)",
+                              color: isMe ? "var(--success)" : "var(--accent)",
+                              cursor: isMe ? "pointer" : "default",
+                            }}>
+                            {n}{isMe ? " ✕" : ""}
+                          </button>
+                        )
+                      })}
+                      {!userOnShift && (
+                        <button
+                          onClick={() => userName && addBoothShift(d.day, s.slot, userName)}
+                          disabled={!userName}
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-full cursor-pointer border disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
+                          style={{
+                            background: "transparent",
+                            color: "var(--text-muted)",
+                            borderColor: "var(--border)",
+                            borderStyle: "dashed",
+                          }}>
+                          + me
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Lead goal progress */}

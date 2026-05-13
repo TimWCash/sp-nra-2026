@@ -1,4 +1,4 @@
-const CACHE = "sp-nra-2026-v4"
+const CACHE = "sp-nra-2026-v5"
 // Network requests that hang longer than this fall back to cache.
 // Trade-show wifi often "looks connected" but stalls — without a timeout
 // the app would hang for 30-60s before browsers give up.

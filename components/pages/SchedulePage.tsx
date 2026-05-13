@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Clock, AlertTriangle, CircleDot, Search, Map, GraduationCap, ChefHat, Wine, Lightbulb, Eye, EyeOff, Route, PartyPopper, ExternalLink, X, CalendarPlus, MapPin, Star, ChevronRight, Moon, Ticket } from "lucide-react"
+import { Clock, AlertTriangle, CircleDot, Search, Map, GraduationCap, ChefHat, Wine, Lightbulb, Eye, EyeOff, Route, PartyPopper, ExternalLink, X, CalendarPlus, MapPin, Star, ChevronRight, Moon, Ticket, Check } from "lucide-react"
 import { schedule, dayTabs, afterHoursEvents, type AfterHoursEvent } from "@/lib/data"
 import { nraSessions, sessionCategories, type Session } from "@/lib/sessions"
 import { supabase } from "@/lib/supabase"
 import { SessionNotes } from "@/components/SessionNotes"
+import { useEventRsvps, addRsvp, removeRsvp } from "@/lib/event-rsvps"
 
 type ViewMode = "team" | "sessions" | "nights"
 
@@ -220,6 +221,16 @@ export function SchedulePage() {
   const [showHidden, setShowHidden] = useState(false)
   const [hiddenAfterHours, setHiddenAfterHours] = useState<Set<string>>(new Set())
   const [showHiddenAfterHours, setShowHiddenAfterHours] = useState(false)
+  // RSVPs: realtime map of event id → list of teammate names going.
+  const eventRsvps = useEventRsvps()
+  // Who am I? Sourced from the same localStorage key SetupPage + SessionNotes use.
+  const [userName, setUserName] = useState<string>("")
+  useEffect(() => {
+    const read = () => setUserName(localStorage.getItem("sp_user_name") || "")
+    read()
+    window.addEventListener("focus", read)
+    return () => window.removeEventListener("focus", read)
+  }, [])
 
   useEffect(() => {
     setUserStars(loadUserStars())
@@ -638,7 +649,15 @@ export function SchedulePage() {
                     {nonSpots.map((ev: AfterHoursEvent) => (
                       <NightEventCard key={ev.id} event={ev}
                         hidden={hiddenAfterHours.has(ev.id)}
-                        onToggleHide={() => toggleHideAfterHours(ev.id)} />
+                        onToggleHide={() => toggleHideAfterHours(ev.id)}
+                        rsvpNames={eventRsvps.get(ev.id) || []}
+                        userName={userName}
+                        onToggleRsvp={async () => {
+                          if (!userName) return
+                          const going = (eventRsvps.get(ev.id) || []).includes(userName)
+                          if (going) await removeRsvp(ev.id, userName)
+                          else await addRsvp(ev.id, userName)
+                        }} />
                     ))}
                   </div>
                 )}
@@ -650,7 +669,15 @@ export function SchedulePage() {
                     {spots.map((ev: AfterHoursEvent) => (
                       <NightEventCard key={ev.id} event={ev}
                         hidden={hiddenAfterHours.has(ev.id)}
-                        onToggleHide={() => toggleHideAfterHours(ev.id)} />
+                        onToggleHide={() => toggleHideAfterHours(ev.id)}
+                        rsvpNames={eventRsvps.get(ev.id) || []}
+                        userName={userName}
+                        onToggleRsvp={async () => {
+                          if (!userName) return
+                          const going = (eventRsvps.get(ev.id) || []).includes(userName)
+                          if (going) await removeRsvp(ev.id, userName)
+                          else await addRsvp(ev.id, userName)
+                        }} />
                     ))}
                   </div>
                 )}
@@ -822,11 +849,18 @@ export function SchedulePage() {
   )
 }
 
-function NightEventCard({ event, hidden, onToggleHide }: {
+function NightEventCard({ event, hidden, onToggleHide, rsvpNames = [], userName = "", onToggleRsvp }: {
   event: AfterHoursEvent
   hidden?: boolean
   onToggleHide?: () => void
+  /** Teammate names who've RSVP'd "I'm going" to this event. */
+  rsvpNames?: string[]
+  /** This device's owner (sp_user_name). Empty = not identified yet. */
+  userName?: string
+  /** Toggle this user's own RSVP on/off. */
+  onToggleRsvp?: () => void
 }) {
+  const userGoing = !!userName && rsvpNames.some((n) => n.toLowerCase() === userName.toLowerCase())
   const aStyle = accessStyle[event.access] || accessStyle.invite
   const emoji = typeEmoji[event.type] || "🎟️"
   const label = accessLabel[event.access] || event.access
@@ -896,6 +930,44 @@ function NightEventCard({ event, hidden, onToggleHide }: {
       {event.notes && (
         <div className="text-[11px] mb-3 leading-relaxed" style={{ color: "var(--text-muted)" }}>
           {event.notes}
+        </div>
+      )}
+
+      {/* RSVP row — "I'm going" toggle + list of teammates going */}
+      {onToggleRsvp && !hidden && (
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <button
+            onClick={onToggleRsvp}
+            disabled={!userName}
+            title={!userName ? "Pick your name on Setup first" : undefined}
+            className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full cursor-pointer transition-all duration-150 active:scale-95 border disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: userGoing ? "var(--success-light)" : "var(--surface-alt)",
+              color: userGoing ? "var(--success)" : "var(--text-secondary)",
+              borderColor: userGoing ? "var(--success)" : "var(--border)",
+            }}>
+            {userGoing ? <><Check size={11} /> Going</> : <>✋ I'm going</>}
+          </button>
+          {rsvpNames.length > 0 && (
+            <div className="flex items-center gap-1 flex-wrap">
+              {rsvpNames.map((n) => {
+                const isMe = !!userName && n.toLowerCase() === userName.toLowerCase()
+                return (
+                  <span key={n}
+                    className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{
+                      background: isMe ? "var(--success-light)" : "var(--accent-light)",
+                      color: isMe ? "var(--success)" : "var(--accent)",
+                    }}>
+                    {n}
+                  </span>
+                )
+              })}
+              <span className="text-[10px] font-semibold" style={{ color: "var(--text-muted)" }}>
+                going
+              </span>
+            </div>
+          )}
         </div>
       )}
 
