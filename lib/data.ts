@@ -150,6 +150,21 @@ export const afterHoursEvents: AfterHoursEvent[] = [
 
   // ── MONDAY MAY 18 ──
   {
+    id: "mon-harri-adp",
+    night: "mon",
+    time: "6:00 PM – 8:00 PM CST",
+    title: "Harri & ADP NRA Happy Hour",
+    host: "Harri + ADP",
+    venue: "VU Rooftop",
+    address: "133 E Cermak Rd, Chicago (Marriott Marquis, ~0.5mi from McCormick)",
+    cost: "Free (RSVP required)",
+    access: "rsvp",
+    link: "https://go.harri.com/nra2026",
+    notes: "Rooftop cocktails + networking with restaurant industry leaders. Limited capacity — RSVPs reviewed individually. Ends right as the House of Blues after-party starts.",
+    type: "happy-hour",
+    confirmed: true,
+  },
+  {
     id: "mon-afterparty",
     night: "mon",
     time: "8:00 PM – 11:00 PM",
