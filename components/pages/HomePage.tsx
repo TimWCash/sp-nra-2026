@@ -80,6 +80,11 @@ export function HomePage({ onNavigate }: HomePageProps) {
   // heal fires, this phone won't receive Bat Signals. The banner is the
   // visible nudge to open Setup and re-arm.
   const [needsRearm, setNeedsRearm] = useState(false)
+  // Live qualified-lead counts — hot + warm, excluding cool — toward the
+  // 50-lead show goal. Realtime subscription on nra_leads keeps every
+  // device's mission card in sync with the actual count.
+  const [qualifiedLeads, setQualifiedLeads] = useState({ hot: 0, warm: 0 })
+  const QUALIFIED_GOAL = 50
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -124,6 +129,30 @@ export function HomePage({ onNavigate }: HomePageProps) {
       window.removeEventListener("focus", check)
       window.removeEventListener("visibilitychange", check)
     }
+  }, [])
+
+  // Live qualified-lead counter — hot + warm — with realtime sync so the
+  // mission card on Home matches the Team Status card without polling.
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      const { data, error } = await supabase
+        .from("nra_leads")
+        .select("heat")
+      if (cancelled || error || !data) return
+      let hot = 0, warm = 0
+      for (const r of data as Array<{ heat: string }>) {
+        if (r.heat === "hot") hot++
+        else if (r.heat === "warm") warm++
+      }
+      setQualifiedLeads({ hot, warm })
+    }
+    load()
+    const channel = supabase
+      .channel("home_qualified_leads")
+      .on("postgres_changes", { event: "*", schema: "public", table: "nra_leads" }, load)
+      .subscribe()
+    return () => { cancelled = true; channel.unsubscribe() }
   }, [])
 
   // Travel + hotel overrides come from the Supabase `team_travel` table
@@ -448,18 +477,53 @@ export function HomePage({ onNavigate }: HomePageProps) {
         </div>
       )}
 
-      {/* Mission Card */}
-      <div className="rounded-2xl p-4 mb-4 flex items-start gap-3"
-        style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: "var(--accent-light)" }}>
-          <Target size={20} style={{ color: "var(--accent)" }} />
-        </div>
-        <div>
-          <div className="font-bold text-[15px]" style={{ color: "var(--text)" }}>Show Goal: 50 Qualified Leads</div>
-          <div className="text-[13px] mt-0.5" style={{ color: "var(--text-muted)" }}>Scan badges, capture notes, book podcast guests. Every conversation counts.</div>
-        </div>
-      </div>
+      {/* Mission Card — live qualified-lead counter toward the show goal.
+          Same data source + realtime subscription as the Team Status card,
+          so all surfaces stay in sync. */}
+      {(() => {
+        const qualified = qualifiedLeads.hot + qualifiedLeads.warm
+        const pct = Math.min(100, Math.round((qualified / QUALIFIED_GOAL) * 100))
+        const hit = qualified >= QUALIFIED_GOAL
+        return (
+          <button
+            onClick={() => onNavigate?.("leads")}
+            className="w-full rounded-2xl p-4 mb-4 cursor-pointer active:scale-[0.99] transition-all duration-200 border-0 text-left"
+            style={{
+              background: "var(--surface)",
+              border: `1px solid ${hit ? "var(--success)" : "var(--border)"}`,
+              boxShadow: "var(--shadow-sm)",
+            }}>
+            <div className="flex items-start gap-3 mb-2.5">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: hit ? "var(--success-light)" : "var(--accent-light)" }}>
+                <Target size={20} style={{ color: hit ? "var(--success)" : "var(--accent)" }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-[15px]" style={{ color: "var(--text)" }}>
+                  Show Goal: {qualified} / {QUALIFIED_GOAL} Qualified Leads {hit ? "🎉" : ""}
+                </div>
+                <div className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                  🔥 {qualifiedLeads.hot} hot · ☀️ {qualifiedLeads.warm} warm. Tap to capture more.
+                </div>
+              </div>
+              <div className="text-[12px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                style={{
+                  background: hit ? "var(--success-light)" : "var(--accent-light)",
+                  color: hit ? "var(--success)" : "var(--accent)",
+                }}>
+                {pct}%
+              </div>
+            </div>
+            <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--surface-alt)" }}>
+              <div className="h-full transition-all duration-500"
+                style={{
+                  width: `${pct}%`,
+                  background: hit ? "var(--success)" : "var(--accent)",
+                }} />
+            </div>
+          </button>
+        )
+      })()}
 
       {/* Show Info Card */}
       <div className="rounded-xl p-4 mb-4"

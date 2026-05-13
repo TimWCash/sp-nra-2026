@@ -148,10 +148,13 @@ export function LeadsPage() {
             {stats.followUp > 0 && <> &middot; <span style={{ color: "var(--amber)" }}>⚑ {stats.followUp} to follow up</span></>}
           </div>
 
-          {/* Team Goal: 50 leads */}
+          {/* Team Goal: 50 qualified leads (hot + warm — cool excluded).
+              Matches the Team Status counter so there's one source of truth
+              for "how are we doing toward the goal". */}
           {(() => {
-            const pct = Math.min(100, Math.round((stats.total / TEAM_GOAL) * 100))
-            const hit = stats.total >= TEAM_GOAL
+            const qualified = stats.hot + stats.warm
+            const pct = Math.min(100, Math.round((qualified / TEAM_GOAL) * 100))
+            const hit = qualified >= TEAM_GOAL
             return (
               <div className="rounded-xl p-3.5 mb-3"
                 style={{ background: "var(--surface)", border: `1px solid ${hit ? "var(--success)" : "var(--border)"}` }}>
@@ -159,19 +162,22 @@ export function LeadsPage() {
                   <div className="flex items-center gap-1.5">
                     <Trophy size={13} style={{ color: hit ? "var(--success)" : "var(--amber)" }} />
                     <span className="text-[12px] font-bold" style={{ color: "var(--text)" }}>
-                      Team Goal {hit ? "— hit 🎉" : ""}
+                      Qualified Goal {hit ? "— hit 🎉" : ""}
                     </span>
                   </div>
                   <span className="text-[12px] font-bold" style={{ color: hit ? "var(--success)" : "var(--accent)" }}>
-                    {stats.total} / {TEAM_GOAL}
+                    {qualified} / {TEAM_GOAL}
                   </span>
                 </div>
-                <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--surface-alt)" }}>
+                <div className="h-2 rounded-full overflow-hidden mb-1.5" style={{ background: "var(--surface-alt)" }}>
                   <div className="h-full transition-all duration-500"
                     style={{
                       width: `${pct}%`,
                       background: hit ? "var(--success)" : "var(--accent)",
                     }} />
+                </div>
+                <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                  Qualified = hot + warm. Cool leads ({stats.cool}) recorded but not counted.
                 </div>
               </div>
             )
