@@ -84,41 +84,62 @@ export async function POST(req: NextRequest) {
     }
     const data = validated.value
 
+    // ── Path 1: Google Service Account (cleanest, auto-creates the tab) ──
     const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-    if (!serviceAccountJson) {
+    if (serviceAccountJson) {
+      const { google } = await import("googleapis")
+      const credentials = JSON.parse(serviceAccountJson)
+      const auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+      })
+      const sheets = google.sheets({ version: "v4", auth })
+      await ensureNotesTabExists(sheets)
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SHEET_ID,
+        range: `${TAB_NAME}!A:E`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: {
+          values: [[
+            data.created_at || new Date().toISOString(),
+            data.session_day,
+            data.session_title,
+            data.author,
+            data.content,
+          ]],
+        },
+      })
+      return NextResponse.json({ status: "ok" })
+    }
+
+    // ── Path 2: Apps Script webhook (same one /api/leads uses, but with
+    // a _type discriminator so the Apps Script knows to route to "Notes"
+    // tab instead of the leads sheet). Tim has to add a small handler to
+    // his existing Apps Script — see chat for the snippet. ──
+    const webhookUrl = process.env.GOOGLE_SHEETS_WEBHOOK_URL
+    if (webhookUrl) {
+      const res = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ ...data, _type: "note" }),
+        redirect: "follow",
+      })
+      const text = await res.text()
+      try {
+        const json = JSON.parse(text)
+        if (json.status === "ok") return NextResponse.json({ status: "ok" })
+      } catch { /* webhook didn't return JSON */ }
+      if (res.ok || res.status === 302) return NextResponse.json({ status: "ok" })
       return NextResponse.json(
-        { status: "error", message: "GOOGLE_SERVICE_ACCOUNT_JSON not configured" },
+        { status: "error", message: "Webhook returned non-ok response" },
         { status: 500 },
       )
     }
 
-    const { google } = await import("googleapis")
-    const credentials = JSON.parse(serviceAccountJson)
-    const auth = new google.auth.GoogleAuth({
-      credentials,
-      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-    })
-    const sheets = google.sheets({ version: "v4", auth })
-
-    // First call auto-creates the tab + header; subsequent calls are no-ops.
-    await ensureNotesTabExists(sheets)
-
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SHEET_ID,
-      range: `${TAB_NAME}!A:E`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [[
-          data.created_at || new Date().toISOString(),
-          data.session_day,
-          data.session_title,
-          data.author,
-          data.content,
-        ]],
-      },
-    })
-
-    return NextResponse.json({ status: "ok" })
+    return NextResponse.json(
+      { status: "error", message: "No Sheets credentials configured (GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SHEETS_WEBHOOK_URL)" },
+      { status: 500 },
+    )
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error"
     console.error("Notes sheet sync error:", message)
