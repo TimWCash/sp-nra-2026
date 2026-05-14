@@ -85,6 +85,44 @@ export function LoadInOutPage() {
       {/* CHECK-IN TAB */}
       {activeTab === "checkin" && (
         <>
+          <SectionLabel>3 Ways to Get Your Materials to the Booth</SectionLabel>
+          <div className="text-[11px] mb-2.5" style={{ color: "var(--text-muted)" }}>
+            If you're driving materials directly to McCormick in a van or SUV, you can unload to the booth in one of three ways:
+          </div>
+          <div className="rounded-xl overflow-hidden mb-4"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+            {[
+              {
+                num: "1",
+                title: "Hand-carry from the parking lot",
+                sub: "Walk it in from the lot at the main entrances using two-wheeled luggage carts, handcarts, dollies, or flatbeds. No fee, no dock pass.",
+              },
+              {
+                num: "2",
+                title: "Loading docks via ASUV",
+                sub: "Drive to the loading docks and self-unload. Requires going through the Marshalling Yard first ($25 entry fee, get a Dock Pass — see below).",
+              },
+              {
+                num: "3",
+                title: "Loading docks via Freeman Cartload Service",
+                sub: "Freeman porters move your materials from your vehicle to the booth. Materials must weigh 250 lbs or less.",
+              },
+            ].map((opt, i, arr) => (
+              <div key={opt.num}
+                className={`px-4 py-3 flex gap-3 items-start ${i < arr.length - 1 ? "border-b" : ""}`}
+                style={{ borderColor: "var(--border)" }}>
+                <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[12px] font-extrabold"
+                  style={{ background: "var(--accent-light)", color: "var(--accent)" }}>
+                  {opt.num}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>{opt.title}</div>
+                  <div className="text-xs mt-0.5 leading-relaxed" style={{ color: "var(--text-muted)" }}>{opt.sub}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
           <SectionLabel>Arrive at Marshalling Yard</SectionLabel>
           <div className="rounded-xl overflow-hidden mb-3"
             style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
