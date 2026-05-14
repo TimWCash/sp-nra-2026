@@ -85,6 +85,63 @@ export function LoadInOutPage() {
       {/* CHECK-IN TAB */}
       {activeTab === "checkin" && (
         <>
+          {/* ── Badge pickup — first thing the team needs once they arrive,
+              before they can do anything else on the show floor. ── */}
+          <SectionLabel>Badge Pickup</SectionLabel>
+          <div className="rounded-xl overflow-hidden mb-3"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+            <div className="px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
+              <div className="text-[11px] font-bold tracking-widest uppercase mb-1.5" style={{ color: "var(--accent)" }}>
+                Onsite (already registered)
+              </div>
+              <div className="text-sm" style={{ color: "var(--text)" }}>
+                <div className="flex items-start gap-1.5 mb-1">
+                  <MapPin size={11} className="mt-1 flex-shrink-0" style={{ color: "var(--text-muted)" }} />
+                  <span>South Building — Room <strong>S102</strong></span>
+                </div>
+                <div className="flex items-start gap-1.5">
+                  <MapPin size={11} className="mt-1 flex-shrink-0" style={{ color: "var(--text-muted)" }} />
+                  <span>Lakeside Center — Level 2 Lobby</span>
+                </div>
+              </div>
+            </div>
+            <div className="px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
+              <div className="text-[11px] font-bold tracking-widest uppercase mb-1.5" style={{ color: "var(--accent)" }}>
+                Hotel Remote Printing
+              </div>
+              <div className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+                Available at: Chicago Marriott Mag Mile · Chicago Sheraton Grand · Hilton Chicago · Hyatt Regency Chicago
+              </div>
+            </div>
+            <div className="px-4 py-3">
+              <div className="text-[11px] font-bold tracking-widest uppercase mb-1.5" style={{ color: "var(--accent)" }}>
+                Group Pickup (5+ badges)
+              </div>
+              <div className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+                Visit the group registration desk: South Building Room <strong>S103</strong>, OR Lakeside Center Level 2.
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl overflow-hidden mb-5"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+            <div className="px-4 py-2 text-[11px] font-bold tracking-widest uppercase" style={{ color: "var(--text-muted)", background: "var(--surface-alt)" }}>
+              Pickup Hours
+            </div>
+            {[
+              { day: "Thu, May 14", hours: "7:00 AM – 5:00 PM" },
+              { day: "Fri, May 15", hours: "7:00 AM – 6:00 PM" },
+              { day: "Sat, May 16", hours: "7:00 AM – 5:00 PM" },
+            ].map((row, i, arr) => (
+              <div key={row.day}
+                className={`flex items-center justify-between px-4 py-2.5 ${i < arr.length - 1 ? "border-b" : ""}`}
+                style={{ borderColor: "var(--border)" }}>
+                <span className="text-sm font-semibold" style={{ color: "var(--text)" }}>{row.day}</span>
+                <span className="text-[12px] font-bold" style={{ color: "var(--accent)" }}>{row.hours}</span>
+              </div>
+            ))}
+          </div>
+
           <SectionLabel>3 Ways to Get Your Materials to the Booth</SectionLabel>
           <div className="text-[11px] mb-2.5" style={{ color: "var(--text-muted)" }}>
             If you're driving materials directly to McCormick in a van or SUV, you can unload to the booth in one of three ways:
