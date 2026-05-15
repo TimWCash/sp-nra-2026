@@ -85,6 +85,42 @@ export function LoadInOutPage() {
       {/* CHECK-IN TAB */}
       {activeTab === "checkin" && (
         <>
+          {/* ── Pro tips from past years — captured live during NRA 2026 load-in.
+              Goes at the very top so whoever's driving sees it before they
+              leave for the yard. Two people in a car, Teamsters on break,
+              wristbands at marshalling, wrong-hall risk — none of this is
+              in the official Freeman docs. ── */}
+          <div className="rounded-xl p-4 mb-5"
+            style={{ background: "var(--amber-light)", color: "var(--amber-fg)", border: "1px solid var(--amber)" }}>
+            <div className="text-[11px] font-bold tracking-widest uppercase mb-2 flex items-center gap-1.5"
+              style={{ color: "var(--amber)" }}>
+              ⚠ Pro Tips from Past Years
+            </div>
+            <ul className="text-[13px] space-y-1.5 list-disc pl-5" style={{ color: "var(--text)" }}>
+              <li>
+                <strong>Use the Google Maps link below — NOT Freeman&apos;s default.</strong> Freeman&apos;s
+                address is &ldquo;S Moe Drive&rdquo; (south) which takes you to a closed road. The correct
+                spot is just &ldquo;Moe Drive&rdquo;.
+              </li>
+              <li>
+                <strong>Bring 2 people in the vehicle.</strong> One driver, one handler. Required for
+                the yard process — driver must always stay with the vehicle.
+              </li>
+              <li>
+                <strong>Teamsters take a break 12:00–12:30 PM.</strong> No movement during that window.
+                Plan around it.
+              </li>
+              <li>
+                <strong>Confirm which hall before driving in.</strong> Easy to end up at the wrong
+                one. Booth #7365 is in the <strong>North Building</strong> (booths 5500–9200).
+              </li>
+              <li>
+                <strong>Pick up wristbands at the marshalling yard</strong> — required to be on the
+                show floor during setup. Easy to miss; ask if they don&apos;t offer them.
+              </li>
+            </ul>
+          </div>
+
           {/* ── Badge pickup — first thing the team needs once they arrive,
               before they can do anything else on the show floor. ── */}
           <SectionLabel>Badge Pickup</SectionLabel>
@@ -184,7 +220,7 @@ export function LoadInOutPage() {
           <div className="rounded-xl overflow-hidden mb-3"
             style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
             {[
-              { icon: "📍", title: "Marshalling Yard Address", sub: "3050 S. Moe Drive, Chicago, IL 60616 · Just west of Lake Shore Drive, ~6 blocks south of McCormick Place" },
+              { icon: "📍", title: "Marshalling Yard Address", sub: "3050 Moe Drive, Chicago, IL 60616 · Just west of Lake Shore Drive, ~6 blocks south of McCormick Place" },
               { icon: "💵", title: "$25.00 fee to enter", sub: "Credit cards accepted · Say you are a Show exhibitor here for SELF UNLOADING via ASUV" },
               { icon: "🪪", title: "Obtain a Dock Pass", sub: "Required — you will NOT be allowed dock access without an ASUV Dock Pass. No additional fee." },
               { icon: "🕑", title: "Marshalling Yard closes at 2:30pm", sub: "Plan your arrival accordingly" },
@@ -199,7 +235,7 @@ export function LoadInOutPage() {
             ))}
           </div>
 
-          <a href="https://maps.app.goo.gl/Ppvt3b72V9VGT1jc9" target="_blank" rel="noopener noreferrer"
+          <a href="https://maps.app.goo.gl/RRStrvTeMiyHjpU96" target="_blank" rel="noopener noreferrer"
             className="flex items-center justify-between p-3.5 rounded-xl no-underline transition-all mb-4 active:scale-[0.98]"
             style={{ background: "var(--accent)", color: "var(--accent-fg)" }}>
             <div className="flex items-center gap-2.5">
