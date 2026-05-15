@@ -50,6 +50,22 @@ in the app under Load In → Check-In → "Pro Tips from Past Years" (commit
   Yard arrival checklist (so it's part of the do-list, not just a tip).
 - **Priority:** P0.
 
+### Designate one person to pick up everyone's badges (Brian, May 15 7:26pm)
+- **What happened:** This year each teammate handled their own badge pickup,
+  which means N trips to the registration desk on arrival, N waits in line,
+  N opportunities to forget something. Wasted time and decision-energy at
+  the start of the show.
+- **Fix for 2027:** designate one "badge wrangler" before the show. NRA
+  already supports group pickup (5+ badges) at South Building Room S103
+  or Lakeside Center Level 2. The wrangler picks up all 7 badges in one
+  trip, distributes at the booth.
+- **What we need:**
+  - Pick a person (probably someone arriving Thursday or early Friday)
+  - Make sure they have everyone's confirmation numbers or IDs in advance
+  - Block 30 min on their schedule for the pickup
+  - Communicate the plan to the team so nobody else goes for their own
+- **Priority:** P0 for 2027 prep.
+
 ---
 
 ## Push notification infrastructure pain
