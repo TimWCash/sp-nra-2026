@@ -223,6 +223,7 @@ export function LoadInOutPage() {
               { icon: "📍", title: "Marshalling Yard Address", sub: "3050 Moe Drive, Chicago, IL 60616 · Just west of Lake Shore Drive, ~6 blocks south of McCormick Place" },
               { icon: "💵", title: "$25.00 fee to enter", sub: "Credit cards accepted · Say you are a Show exhibitor here for SELF UNLOADING via ASUV" },
               { icon: "🪪", title: "Obtain a Dock Pass", sub: "Required — you will NOT be allowed dock access without an ASUV Dock Pass. No additional fee." },
+              { icon: "🎟️", title: "Pick up your wristbands", sub: "Required for show-floor access during setup. Easy to miss — ASK if they don't offer them." },
               { icon: "🕑", title: "Marshalling Yard closes at 2:30pm", sub: "Plan your arrival accordingly" },
             ].map((item, i, arr) => (
               <div key={i} className={`px-4 py-3 flex gap-3 items-start ${i < arr.length - 1 ? "border-b" : ""}`} style={{ borderColor: "var(--border)" }}>
