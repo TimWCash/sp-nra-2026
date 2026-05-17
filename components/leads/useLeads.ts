@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { supabase } from "@/lib/supabase"
-import { syncLead, syncPending, getPendingCount, computeSyncStatus, type SyncStatus } from "@/lib/sheets-sync"
+import { syncLead, syncPending, getPendingCount, getSyncedIds, computeSyncStatus, type SyncStatus } from "@/lib/sheets-sync"
 import {
   cacheLeads,
   loadCachedLeads,
@@ -126,9 +126,13 @@ export function useLeads() {
         if (n > 0) {
           await fetchLeads()
           // Find the ones that successfully left the queue and push them to
-          // Sheets. syncLead is idempotent — already-synced ids short-circuit.
+          // Sheets — BUT only if they aren't already in the Sheet. The Sheets
+          // API is append-only, so re-syncing an already-known lead (e.g. one
+          // that was originally captured online and then edited offline) would
+          // create a duplicate row. The syncedIds cache is our defense.
           const stillQueued = new Set(getPendingLeadsOffline().map((p) => p.id))
-          const justLanded = snapshot.filter((p) => !stillQueued.has(p.id))
+          const syncedIds = getSyncedIds()
+          const justLanded = snapshot.filter((p) => !stillQueued.has(p.id) && !syncedIds.has(p.id))
           for (const lead of justLanded) {
             syncLead(lead).catch(() => { /* queues internally on failure */ })
           }
@@ -305,21 +309,13 @@ export function useLeads() {
     if (insertedOk) {
       await dequeueLead(next.id)
       refreshPendingCount()
-      setSyncingIds((prev) => {
-        const s = new Set(prev)
-        s.add(next.id)
-        return s
-      })
-      syncLead(next).finally(() => {
-        setSyncingIds((prev) => {
-          const s = new Set(prev)
-          s.delete(next.id)
-          return s
-        })
-        refreshPendingCount()
-      })
     }
-
+    // NOTE: we intentionally do NOT call syncLead on edits. The Google Sheet
+    // API at /api/leads is append-only, so re-syncing would create a duplicate
+    // row instead of updating the existing one. The Supabase row IS updated
+    // (source of truth), and the in-app view + CSV export reflect the edit.
+    // The Sheet stays at the original capture until a manual "Push to Sheet"
+    // backfill — same trade-off as toggleFollowUp.
     return {
       ok: true,
       error: photoTooBig
