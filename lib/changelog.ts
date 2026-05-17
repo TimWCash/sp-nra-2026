@@ -29,6 +29,13 @@ export type ChangelogEntry = {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-05-17-badge-gallery",
+    emoji: "🪪",
+    title: "New: flip through every badge pic in one grid",
+    body: "More → Badge Pics → Open badge gallery. Every scanned badge in one place, tap any tile for a full-screen view, swipe through like a photo album.",
+    cta: { label: "Open it", page: "more" },
+  },
+  {
     id: "2026-05-17-lead-save-edit",
     emoji: "🛠️",
     title: "Fixed: Save bug + you can edit leads now",

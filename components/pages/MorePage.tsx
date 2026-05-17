@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Copy, Mail, Users, MessageCircle, Activity, Truck, ChevronRight, HelpCircle, ChevronDown, StickyNote, Camera, PackageOpen, PackageCheck, Smartphone, ExternalLink, Download, Loader2 } from "lucide-react"
+import { Copy, Mail, Users, MessageCircle, Activity, Truck, ChevronRight, HelpCircle, ChevronDown, StickyNote, Camera, PackageOpen, PackageCheck, Smartphone, ExternalLink, Download, Loader2, IdCard } from "lucide-react"
 import { keyDates, emailTemplate } from "@/lib/data"
 import { supabase } from "@/lib/supabase"
+import { BadgeGallery } from "@/components/BadgeGallery"
 import type { PageId } from "@/components/layout/BottomNav"
 
 const badgeVariant: Record<string, string> = {
@@ -90,6 +91,8 @@ export function MorePage({ onNavigate }: MorePageProps) {
   const [backupStatus, setBackupStatus] = useState<"idle" | "fetching" | "done" | "error">("idle")
   const [backupError, setBackupError] = useState<string | null>(null)
   const [backupStats, setBackupStats] = useState<string>("")
+  // Badge gallery modal open state.
+  const [galleryOpen, setGalleryOpen] = useState(false)
 
   useEffect(() => {
     const saved = localStorage.getItem("sp_nra_captured_by")
@@ -216,6 +219,23 @@ export function MorePage({ onNavigate }: MorePageProps) {
             <ChevronRight size={16} style={{ color: "var(--text-muted)", opacity: 0.5 }} />
           </button>
         ))}
+      </div>
+
+      {/* Badge Gallery — flip through every scanned badge as a thumbnail
+          grid. Tap → fullscreen lightbox with prev/next. Loads lazily
+          when opened so the MorePage scroll stays light. */}
+      <SectionLabel>Badge Pics</SectionLabel>
+      <div className="rounded-xl p-4 mb-6"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
+        <div className="text-[12px] mb-3" style={{ color: "var(--text-secondary)" }}>
+          Every badge photo the team has scanned this show, in one grid. Tap any tile
+          for a full-screen view — swipe or arrow through them like a photo album.
+        </div>
+        <button onClick={() => setGalleryOpen(true)}
+          className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-[13px] font-bold cursor-pointer active:scale-[0.98] transition-all border-0"
+          style={{ background: "var(--accent)", color: "var(--accent-fg)" }}>
+          <IdCard size={14} /> Open badge gallery
+        </button>
       </div>
 
       {/* ── BACKUP — pull all Supabase data into a single JSON file the
@@ -345,6 +365,10 @@ export function MorePage({ onNavigate }: MorePageProps) {
           </a>
         </div>
       </div>
+
+      {/* Badge gallery modal — mounted at root so its overlay covers
+          the whole page when open. */}
+      <BadgeGallery open={galleryOpen} onClose={() => setGalleryOpen(false)} />
 
       {/* How To Use (moved to the very bottom) */}
       <SectionLabel>How to Use This App</SectionLabel>
