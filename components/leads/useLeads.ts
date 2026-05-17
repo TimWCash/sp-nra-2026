@@ -258,6 +258,76 @@ export function useLeads() {
     return { ok: true }
   }, [refreshPendingCount])
 
+  const updateLead = useCallback(async (
+    id: string,
+    data: Omit<Lead, "id" | "time">,
+  ): Promise<{ ok: boolean; error?: string }> => {
+    // Edit an existing lead — same offline-first pipeline as addLead, but
+    // we reuse the original id (so the Supabase upsert replaces the existing
+    // row in place and Sheets sync overwrites the previous row).
+    const existing = leads.find((l) => l.id === id)
+    if (!existing) return { ok: false, error: "Lead not found." }
+
+    // Same badge photo size guard as addLead: cap at ~150KB to protect
+    // offline storage. If the user uploads a too-big photo, drop it and warn.
+    const MAX_BADGE_PHOTO_LEN = 150_000
+    const photoTooBig = data.badgePhoto && data.badgePhoto.length > MAX_BADGE_PHOTO_LEN
+    const safeBadgePhoto = photoTooBig ? undefined : data.badgePhoto
+
+    const next: Lead = {
+      ...existing,
+      name: data.name,
+      company: data.company || "",
+      role: data.role || "",
+      contact: data.contact || "",
+      notes: data.notes || "",
+      heat: data.heat,
+      badgePhoto: safeBadgePhoto,
+      capturedBy: data.capturedBy,
+      followUp: data.followUp ?? existing.followUp ?? false,
+      // keep id + time so the lead stays where it is in the timeline
+    }
+
+    const queued = await queueLead(next)
+    if (!queued.ok) {
+      return {
+        ok: false,
+        error: queued.error || "Could not queue edit — try again.",
+      }
+    }
+
+    // Optimistic UI swap.
+    setLeads((prev) => prev.map((l) => (l.id === id ? next : l)))
+    cacheLeads(loadCachedLeads().map((l) => (l.id === id ? next : l)))
+    refreshPendingCount()
+
+    const insertedOk = await insertLead(supabase, next)
+    if (insertedOk) {
+      await dequeueLead(next.id)
+      refreshPendingCount()
+      setSyncingIds((prev) => {
+        const s = new Set(prev)
+        s.add(next.id)
+        return s
+      })
+      syncLead(next).finally(() => {
+        setSyncingIds((prev) => {
+          const s = new Set(prev)
+          s.delete(next.id)
+          return s
+        })
+        refreshPendingCount()
+      })
+    }
+
+    return {
+      ok: true,
+      error: photoTooBig
+        ? "Lead updated, but the badge photo was skipped to protect offline storage."
+        : undefined,
+    }
+  }, [leads, refreshPendingCount])
+
   const toggleFollowUp = useCallback(async (id: string, current: boolean): Promise<{ ok: boolean; error?: string }> => {
     const updated: Lead | undefined = leads.find((l) => l.id === id)
     if (!updated) return { ok: false, error: "Lead not found." }
@@ -423,6 +493,7 @@ export function useLeads() {
     loading,
     leaderboard,
     addLead,
+    updateLead,
     deleteLead,
     toggleFollowUp,
     clearAll,

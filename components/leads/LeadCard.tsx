@@ -1,6 +1,6 @@
 "use client"
 
-import { X, Flame, Sun, Snowflake, Flag } from "lucide-react"
+import { X, Flame, Sun, Snowflake, Flag, Pencil } from "lucide-react"
 import type { Lead } from "./useLeads"
 
 function HeatBadge({ heat }: { heat: string }) {
@@ -22,9 +22,10 @@ interface LeadCardProps {
   lead: Lead
   onDelete: (id: string) => void
   onToggleFollowUp: (id: string, current: boolean) => void
+  onEdit?: (lead: Lead) => void
 }
 
-export function LeadCard({ lead, onDelete, onToggleFollowUp }: LeadCardProps) {
+export function LeadCard({ lead, onDelete, onToggleFollowUp, onEdit }: LeadCardProps) {
   return (
     <div className="rounded-xl p-4"
       style={{
@@ -43,6 +44,19 @@ export function LeadCard({ lead, onDelete, onToggleFollowUp }: LeadCardProps) {
           {lead.contact && <div className="text-xs mt-1 font-medium" style={{ color: "var(--accent)" }}>{lead.contact}</div>}
         </div>
         <div className="flex gap-1.5 flex-shrink-0">
+          {onEdit && (
+            <button
+              onClick={() => onEdit(lead)}
+              aria-label="Edit lead"
+              className="w-9 h-9 rounded-lg flex items-center justify-center cursor-pointer flex-shrink-0 transition-all duration-200 active:scale-[0.93]"
+              style={{
+                background: "var(--surface-alt)",
+                border: "1px solid var(--border)",
+                color: "var(--text-muted)",
+              }}>
+              <Pencil size={14} />
+            </button>
+          )}
           <button
             onClick={() => onToggleFollowUp(lead.id, !!lead.followUp)}
             aria-label="Toggle follow-up"

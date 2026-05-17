@@ -6,11 +6,23 @@ import { cn } from "@/lib/utils"
 import type { HeatLevel } from "./useLeads"
 
 const TEAM_MEMBERS = ["Brian", "Rebecca", "Maria", "Steve", "Kelly", "Emily", "Ellis"] as const
+// Primary: unified per-device user identity (SetupPage/SessionNotes also use this).
+const USER_NAME_KEY = "sp_user_name"
+// Legacy: older per-form storage. Kept as fallback for devices that picked
+// here before SetupPage existed.
 const CAPTURED_BY_KEY = "sp_nra_captured_by"
 
 function getSavedCapturedBy(): string {
   if (typeof window === "undefined") return ""
-  return localStorage.getItem(CAPTURED_BY_KEY) || ""
+  // Prefer the unified identity set by Setup/Notes so "who's logging this?"
+  // auto-fills the moment the user opens the form. Removes the silent-fail
+  // bug Brian hit during NRA 2026: tapping Save with capturedBy empty did
+  // nothing visible because the validation indicator was at the top of
+  // the form, well above the user's tap point.
+  const unified = (localStorage.getItem(USER_NAME_KEY) || "").trim()
+  if (unified && (TEAM_MEMBERS as readonly string[]).includes(unified)) return unified
+  const legacy = (localStorage.getItem(CAPTURED_BY_KEY) || "").trim()
+  return legacy
 }
 
 import type { Lead } from "./useLeads"
@@ -20,6 +32,12 @@ interface LeadFormProps {
   onClose: () => void
   onSave: (data: { name: string; company: string; role: string; contact: string; notes: string; heat: HeatLevel; badgePhoto?: string; capturedBy: string }) => void
   existingLeads?: Lead[]
+  /**
+   * If provided, the form opens in EDIT mode — pre-fills every field from
+   * the lead, changes the title + Save button label, and the caller's
+   * onSave is treated as an update rather than a create.
+   */
+  editLead?: Lead | null
 }
 
 function resizeImage(file: File, maxWidth: number): Promise<string> {
@@ -42,7 +60,7 @@ function resizeImage(file: File, maxWidth: number): Promise<string> {
   })
 }
 
-export function LeadForm({ open, onClose, onSave, existingLeads = [] }: LeadFormProps) {
+export function LeadForm({ open, onClose, onSave, existingLeads = [], editLead }: LeadFormProps) {
   const [name, setName] = useState("")
   const [company, setCompany] = useState("")
   const [role, setRole] = useState("")
@@ -60,10 +78,28 @@ export function LeadForm({ open, onClose, onSave, existingLeads = [] }: LeadForm
   const detailsRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cardInputRef = useRef<HTMLInputElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
+  // Hydrate state when the form opens. In CREATE mode: blank fields with
+  // capturedBy auto-defaulted from sp_user_name. In EDIT mode: every field
+  // populated from editLead so the user sees their existing values.
   useEffect(() => {
-    if (open) setCapturedBy(getSavedCapturedBy())
-  }, [open])
+    if (!open) return
+    if (editLead) {
+      setName(editLead.name || "")
+      setCompany(editLead.company || "")
+      setRole(editLead.role || "")
+      setContact(editLead.contact || "")
+      setNotes(editLead.notes || "")
+      setHeat(editLead.heat)
+      setBadgePhoto(editLead.badgePhoto)
+      // Pre-fill with the original capturer, but fall back to the device's
+      // identity if the row was created before that field existed.
+      setCapturedBy(editLead.capturedBy || getSavedCapturedBy())
+    } else {
+      setCapturedBy(getSavedCapturedBy())
+    }
+  }, [open, editLead])
 
   if (!open) return null
 
@@ -73,12 +109,20 @@ export function LeadForm({ open, onClose, onSave, existingLeads = [] }: LeadForm
   }
 
   function handleSave() {
+    // Validate name first.
     if (!name.trim()) {
       setNameError(true)
+      // Scroll the user back up so they SEE the name field highlighted.
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" })
       return
     }
+    // Validate capturedBy. Previously this set an error indicator at the top
+    // of the form but the Save button is at the bottom — user tapped Save,
+    // nothing visibly happened. Now we ALSO scroll to top so the highlighted
+    // capturedBy row + "Required" label is in view.
     if (!capturedBy) {
       setCapturedByError(true)
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" })
       return
     }
     onSave({ name: name.trim(), company: company.trim(), role: role.trim(), contact: contact.trim(), notes: notes.trim(), heat, badgePhoto, capturedBy })
@@ -141,18 +185,22 @@ export function LeadForm({ open, onClose, onSave, existingLeads = [] }: LeadForm
   const inputCls = "w-full rounded-lg text-[15px] px-3.5 py-3 mb-2.5 outline-none transition-all duration-200"
 
   return (
-    <div className="fixed inset-0 z-[200] p-5 overflow-y-auto flex flex-col justify-center"
+    <div ref={scrollContainerRef} className="fixed inset-0 z-[200] p-5 overflow-y-auto flex flex-col justify-center"
       style={{ background: "var(--overlay)", backdropFilter: "blur(8px)" }}>
       <div className="rounded-2xl p-5 w-full max-w-[480px] mx-auto"
         style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-lg)" }}>
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold" style={{ color: "var(--text)" }}>New Lead</h2>
+          <h2 className="text-lg font-bold" style={{ color: "var(--text)" }}>
+            {editLead ? "Edit Lead" : "New Lead"}
+          </h2>
           <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer"
             style={{ background: "var(--surface-alt)", border: "1px solid var(--border)", color: "var(--text-muted)" }}>
             <X size={16} />
           </button>
         </div>
-        <p className="text-[13px] mb-4" style={{ color: "var(--text-muted)" }}>Scan a badge or card to auto-fill, or enter manually.</p>
+        <p className="text-[13px] mb-4" style={{ color: "var(--text-muted)" }}>
+          {editLead ? "Update any field and Save Changes." : "Scan a badge or card to auto-fill, or enter manually."}
+        </p>
 
         {/* Captured By */}
         <div className="flex items-center justify-between mb-2">
@@ -252,10 +300,28 @@ export function LeadForm({ open, onClose, onSave, existingLeads = [] }: LeadForm
           ))}
         </div>
 
+        {/* Inline validation feedback at the user's tap location. The
+            field-level errors above (red labels + "Required") were getting
+            missed because they're at the TOP of the form and the user is
+            looking at the Save button at the BOTTOM. This makes the missing
+            field impossible to ignore. */}
+        {(nameError || capturedByError) && (
+          <div className="rounded-lg p-3 mb-2.5 text-[12px] font-semibold flex items-start gap-2"
+            style={{ background: "var(--danger-light)", color: "var(--danger)", border: "1px solid var(--danger)" }}>
+            <span>⚠</span>
+            <span>
+              {nameError && capturedByError
+                ? "Add the lead's name AND pick who's logging this (highlighted at the top)."
+                : nameError
+                  ? "Add the lead's name first (highlighted at the top)."
+                  : "Pick who's logging this lead — at the top of the form."}
+            </span>
+          </div>
+        )}
         <button onClick={handleSave}
           className="w-full rounded-lg text-[15px] font-bold py-3.5 cursor-pointer mb-2.5 transition-all duration-200 active:scale-[0.98]"
           style={{ background: "var(--accent)", color: "var(--accent-fg)", border: "none" }}>
-          Save Lead
+          {editLead ? "Save Changes" : "Save Lead"}
         </button>
         <button onClick={onClose}
           className="w-full rounded-lg text-sm py-3 cursor-pointer"

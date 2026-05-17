@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Plus, Download, Copy, Trash2, Users, Flag, Trophy, Mail, Sheet, Loader2, CheckCircle2, AlertCircle } from "lucide-react"
-import { useLeads } from "@/components/leads/useLeads"
+import { useLeads, type Lead } from "@/components/leads/useLeads"
 import { LeadForm } from "@/components/leads/LeadForm"
 import { LeadCard } from "@/components/leads/LeadCard"
 
@@ -12,11 +12,12 @@ type FilterKey = "all" | "mine" | "hot" | "warm" | "cool" | "followUp"
 
 export function LeadsPage() {
   const {
-    leads, stats, leaderboard, addLead, deleteLead, toggleFollowUp,
+    leads, stats, leaderboard, addLead, updateLead, deleteLead, toggleFollowUp,
     exportCSV, emailLeads, copyAll,
     syncStatus, pendingCount, pendingSupabase, isSyncing, syncNow, backfillToSheet,
   } = useLeads()
   const [formOpen, setFormOpen] = useState(false)
+  const [editingLead, setEditingLead] = useState<Lead | null>(null)
   const [copyLabel, setCopyLabel] = useState("Copy All")
   const [filter, setFilter] = useState<FilterKey>("all")
   const [showLeaderboard, setShowLeaderboard] = useState(false)
@@ -70,7 +71,21 @@ export function LeadsPage() {
         : "Sheet")
 
   async function handleSave(data: Parameters<typeof addLead>[0]) {
-    // Duplicate detection
+    // EDIT path — when editingLead is set, replace that row in place.
+    // Skip duplicate detection on edit (you're modifying the existing record,
+    // and your own name/contact will trivially match itself).
+    if (editingLead) {
+      const result = await updateLead(editingLead.id, data)
+      if (!result.ok) {
+        window.alert(result.error || "Could not update lead — try again.")
+        return
+      }
+      if (result.error) window.alert(result.error)
+      setEditingLead(null)
+      return
+    }
+
+    // ADD path — duplicate detection
     const dupe = leads.find((l) =>
       l.name.toLowerCase() === data.name.toLowerCase() ||
       (data.contact && l.contact && l.contact.toLowerCase() === data.contact.toLowerCase())
@@ -89,6 +104,16 @@ export function LeadsPage() {
       // Save succeeded but with a warning (e.g. photo skipped). Non-blocking.
       window.alert(result.error)
     }
+  }
+
+  function handleEdit(lead: Lead) {
+    setEditingLead(lead)
+    setFormOpen(true)
+  }
+
+  function handleCloseForm() {
+    setFormOpen(false)
+    setEditingLead(null)
   }
 
   const myCount = leads.filter((l) => l.capturedBy === myName).length
@@ -276,12 +301,24 @@ export function LeadsPage() {
       ) : (
         <div className="space-y-2.5">
           {filtered.map((lead) => (
-            <LeadCard key={lead.id} lead={lead} onDelete={deleteLead} onToggleFollowUp={toggleFollowUp} />
+            <LeadCard
+              key={lead.id}
+              lead={lead}
+              onDelete={deleteLead}
+              onToggleFollowUp={toggleFollowUp}
+              onEdit={handleEdit}
+            />
           ))}
         </div>
       )}
 
-      <LeadForm open={formOpen} onClose={() => setFormOpen(false)} onSave={handleSave} existingLeads={leads} />
+      <LeadForm
+        open={formOpen || editingLead !== null}
+        onClose={handleCloseForm}
+        onSave={handleSave}
+        existingLeads={leads}
+        editLead={editingLead}
+      />
 
       <button onClick={() => setFormOpen(true)} aria-label="Add lead"
         className="fixed bottom-[calc(64px+env(safe-area-inset-bottom,0px))] right-4 w-14 h-14 rounded-full border-none cursor-pointer flex items-center justify-center z-[99] transition-all duration-200 active:scale-[0.93]"
