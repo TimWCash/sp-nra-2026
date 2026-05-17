@@ -29,6 +29,13 @@ export type ChangelogEntry = {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-05-17-lead-save-edit",
+    emoji: "🛠️",
+    title: "Fixed: Save bug + you can edit leads now",
+    body: "Two fixes from Brian's load-in feedback: (1) Save no longer silently fails when \"Who's logging this?\" is empty — it now auto-fills from your Setup name and shows a big warning if missing. (2) Tap the ✏️ pencil on any lead card to edit it.",
+    cta: { label: "Add a lead", page: "leads" },
+  },
+  {
     id: "2026-05-13-qualified-leads",
     emoji: "🎯",
     title: "New: Qualified Leads counter (replaces daily count)",
